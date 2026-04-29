@@ -1,6 +1,6 @@
 import { AuthProvider, useAuth } from './context/AuthContext'
-import Login from './pages/Login'
-import Layout from './components/layout/Layout'
+import Login from './pages/login.jsx'
+import Layout from './components/layout/layout.jsx'
 import { Toaster } from 'react-hot-toast'
 
 const AppContent = () => {
