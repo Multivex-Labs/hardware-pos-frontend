@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
-import logo from '../assets/logo.png'
 
 const Sales = () => {
   const { user } = useAuth()
@@ -20,17 +19,37 @@ const Sales = () => {
   const [activeTab, setActiveTab] = useState('new')
   const [lastSale, setLastSale] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [barcodeInput, setBarcodeInput] = useState('')
 
-  const formatTSh = (amount) => `TSh ${(parseFloat(amount || 0) * 2600).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  // ✅ CORRECT TZS FORMATTING - NO CONVERSION!
+  const formatTZS = (amount) => {
+    const num = parseFloat(amount || 0)
+    return `TSh ${num.toLocaleString('en-US', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    })}`
+  }
 
   useEffect(() => {
-    getProducts().then(res => {
-      setProducts(res.data)
-      setFilteredProducts(res.data)
-    }).catch(() => {})
-    getClients().then(res => setClients(res.data)).catch(() => {})
-    getSales().then(res => setSales(res.data)).catch(() => {})
+    loadData()
   }, [])
+
+  const loadData = () => {
+    getProducts()
+      .then(res => {
+        setProducts(res.data)
+        setFilteredProducts(res.data)
+      })
+      .catch(() => toast.error('Failed to load products'))
+    
+    getClients()
+      .then(res => setClients(res.data))
+      .catch(() => {})
+    
+    getSales()
+      .then(res => setSales(res.data))
+      .catch(() => {})
+  }
 
   const handleSearch = (e) => {
     const query = e.target.value.toLowerCase()
@@ -42,11 +61,28 @@ const Sales = () => {
     setFilteredProducts(filtered)
   }
 
+  const handleBarcodeSearch = (e) => {
+    const barcode = e.target.value
+    setBarcodeInput(barcode)
+    
+    if (barcode.length > 2) {
+      const product = products.find(p => 
+        p.id.toString() === barcode ||
+        p.name.toLowerCase().includes(barcode.toLowerCase())
+      )
+      if (product) {
+        addToCart(product)
+        setBarcodeInput('')
+        toast.success(`✓ ${product.name} added!`)
+      }
+    }
+  }
+
   const addToCart = (product) => {
     const existing = cart.find(item => item.product_id === product.id)
     if (existing) {
       if (existing.quantity >= product.stock) {
-        toast.error(`Stock not enough — only ${product.stock} available`)
+        toast.error(`Insufficient stock - only ${product.stock} available`)
         return
       }
       setCart(cart.map(item =>
@@ -58,12 +94,12 @@ const Sales = () => {
       setCart([...cart, { 
         product_id: product.id, 
         name: product.name, 
-        price: product.price, 
+        price: parseFloat(product.price), 
         quantity: 1,
         unit: product.unit || 'PC'
       }])
     }
-    toast.success(`✓ ${product.name} added`)
+    toast.success(`✓ ${product.name}`)
   }
 
   const removeFromCart = (product_id) => {
@@ -71,107 +107,154 @@ const Sales = () => {
   }
 
   const updateQuantity = (product_id, quantity) => {
-    if (quantity < 1) return
+    const qty = parseInt(quantity)
+    if (qty < 1) return
+    const product = products.find(p => p.id === product_id)
+    if (qty > product.stock) {
+      toast.error(`Stock only has ${product.stock} items`)
+      return
+    }
     setCart(cart.map(item =>
-      item.product_id === product_id ? { ...item, quantity: parseInt(quantity) } : item
+      item.product_id === product_id ? { ...item, quantity: qty } : item
     ))
   }
 
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const total = cart.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0)
   const finalTotal = total - parseFloat(discount || 0)
 
   const printReceipt = (saleData) => {
-    const doc = new jsPDF()
-    
-    // Add logo
-    const img = new Image()
-    img.src = logo
-    doc.addImage(img, 'PNG', 85, 10, 40, 25)
-    
-    // Header
-    doc.setFontSize(18)
-    doc.setFont('helvetica', 'bold')
-    doc.text('PIUS HARDWARE', 105, 42, { align: 'center' })
-    
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    doc.text('P.O.BOX 4629, MBEYA TANZANIA', 105, 48, { align: 'center' })
-    doc.text('Tel: 0764067682 / 0759494763 / 0756146747', 105, 53, { align: 'center' })
-    
-    doc.setFontSize(14)
-    doc.setFont('helvetica', 'bold')
-    doc.text('CASH RECEIPT', 105, 63, { align: 'center' })
-    
-    doc.setLineWidth(0.5)
-    doc.line(20, 68, 190, 68)
-    
-    // Receipt info
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Receipt #: ${saleData.saleId || 'N/A'}`, 20, 75)
-    doc.text(`Date: ${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString('en-GB')}`, 20, 80)
-    doc.text(`Customer: ${saleData.clientName || 'WALK-IN'}`, 20, 85)
-    doc.text(`Currency: TSHS`, 20, 90)
-    
-    // Table
-    const tableData = saleData.items.map((item, i) => [
-      i + 1,
-      item.name,
-      item.unit || 'PC',
-      item.quantity,
-      (parseFloat(item.price) * 2600).toLocaleString('en-US', { minimumFractionDigits: 2 }),
-      (parseFloat(item.price) * item.quantity * 2600).toLocaleString('en-US', { minimumFractionDigits: 2 })
-    ])
-    
-    doc.autoTable({
-      startY: 95,
-      head: [['S/N', 'Description of Goods', 'Unit', 'Qty', 'Price', 'Total']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
-      styles: { fontSize: 9, cellPadding: 3 },
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 15 },
-        1: { cellWidth: 70 },
-        2: { halign: 'center', cellWidth: 20 },
-        3: { halign: 'center', cellWidth: 15 },
-        4: { halign: 'right', cellWidth: 35 },
-        5: { halign: 'right', cellWidth: 35 }
+    try {
+      const doc = new jsPDF()
+      
+      doc.setFontSize(20)
+      doc.setFont('helvetica', 'bold')
+      doc.text('PIUS HARDWARE', 105, 20, { align: 'center' })
+      
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.text('P.O.BOX 4629, MBEYA TANZANIA', 105, 28, { align: 'center' })
+      doc.text('Phone: 0764067682 / 0759494763 / 0756146747', 105, 34, { align: 'center' })
+      
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.text('SALES RECEIPT', 105, 45, { align: 'center' })
+      
+      doc.line(20, 50, 190, 50)
+      
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      const now = new Date()
+      doc.text(`Receipt #: ${saleData.saleId || 'N/A'}`, 20, 58)
+      doc.text(`Date: ${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, 20, 64)
+      doc.text(`Customer: ${saleData.clientName || 'WALK-IN'}`, 20, 70)
+      doc.text(`Cashier: ${saleData.cashierName || 'CASHIER'}`, 20, 76)
+      
+      const tableData = saleData.items.map((item, i) => [
+        i + 1,
+        item.name,
+        item.unit || 'PC',
+        item.quantity,
+        parseFloat(item.price).toFixed(2),
+        (parseFloat(item.price) * item.quantity).toFixed(2)
+      ])
+      
+      doc.autoTable({
+        startY: 82,
+        head: [['#', 'Product', 'Unit', 'Qty', 'Price (TSh)', 'Total (TSh)']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { 
+          fillColor: [41, 128, 185], 
+          textColor: 255, 
+          fontStyle: 'bold',
+          fontSize: 10
+        },
+        styles: { 
+          fontSize: 9, 
+          cellPadding: 4
+        },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 12 },
+          1: { cellWidth: 70 },
+          2: { halign: 'center', cellWidth: 18 },
+          3: { halign: 'center', cellWidth: 18 },
+          4: { halign: 'right', cellWidth: 32 },
+          5: { halign: 'right', cellWidth: 38 }
+        }
+      })
+      
+      const finalY = doc.lastAutoTable.finalY + 10
+      
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      
+      const subtotal = parseFloat(saleData.total) + parseFloat(saleData.discount || 0)
+      doc.text('Subtotal:', 130, finalY)
+      doc.text(`TSh ${subtotal.toFixed(2)}`, 190, finalY, { align: 'right' })
+      
+      if (saleData.discount > 0) {
+        doc.text('Discount:', 130, finalY + 6)
+        doc.text(`-TSh ${parseFloat(saleData.discount).toFixed(2)}`, 190, finalY + 6, { align: 'right' })
       }
-    })
-    
-    const finalY = doc.lastAutoTable.finalY + 10
-    
-    // Grand Total
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    const grandTotal = (parseFloat(saleData.total) * 2600).toLocaleString('en-US', { minimumFractionDigits: 2 })
-    doc.text(`Grand Total: TSh ${grandTotal}`, 190, finalY, { align: 'right' })
-    
-    // Footer
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'italic')
-    doc.text('JENGA NA PIUS HARDWARE', 105, finalY + 15, { align: 'center' })
-    
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Served By: ${saleData.cashierName || 'CASHIER'}`, 105, finalY + 20, { align: 'center' })
-    
-    doc.autoPrint()
-    window.open(doc.output('bloburl'), '_blank')
+      
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      const yPos = finalY + (saleData.discount > 0 ? 15 : 9)
+      doc.text('GRAND TOTAL:', 130, yPos)
+      doc.text(`TSh ${parseFloat(saleData.total).toFixed(2)}`, 190, yPos, { align: 'right' })
+      
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Payment: ${saleData.paymentMethod.toUpperCase().replace('_', ' ')}`, 105, yPos + 12, { align: 'center' })
+      
+      doc.setFont('helvetica', 'italic')
+      doc.setFontSize(11)
+      doc.text('BUILD WITH PIUS HARDWARE', 105, yPos + 25, { align: 'center' })
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.text('Thank you for your purchase!', 105, yPos + 32, { align: 'center' })
+      
+      const pdfBlob = doc.output('blob')
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+      const printWindow = window.open(pdfUrl, '_blank')
+      
+      if (printWindow) {
+        printWindow.onload = () => {
+          setTimeout(() => printWindow.print(), 250)
+        }
+        toast.success('✓ Receipt ready!')
+      } else {
+        toast.error('Please allow pop-ups first!')
+      }
+      
+    } catch (error) {
+      console.error('Print error:', error)
+      toast.error('Failed: ' + error.message)
+    }
   }
 
   const handleSale = async () => {
     if (cart.length === 0) {
-      toast.error('Add items to cart first!')
+      toast.error('Add products first!')
       return
     }
+    
+    if (finalTotal < 0) {
+      toast.error('Total cannot be negative!')
+      return
+    }
+    
     setLoading(true)
     try {
       const res = await createSale({
         client_id: selectedClient || null,
         payment_method: paymentMethod,
         discount: parseFloat(discount || 0),
-        items: cart.map(item => ({ product_id: item.product_id, quantity: item.quantity }))
+        items: cart.map(item => ({ 
+          product_id: item.product_id, 
+          quantity: item.quantity,
+          price: parseFloat(item.price)
+        }))
       })
       
       const client = clients.find(c => c.id == selectedClient)
@@ -189,16 +272,17 @@ const Sales = () => {
       setLastSale(saleData)
       toast.success('✓ Sale completed successfully!')
       
+      setTimeout(() => printReceipt(saleData), 500)
+      
       setCart([])
       setSelectedClient('')
       setDiscount(0)
-      getProducts().then(res => {
-        setProducts(res.data)
-        setFilteredProducts(res.data)
-      })
-      getSales().then(res => setSales(res.data))
+      setPaymentMethod('cash')
+      
+      loadData()
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Sale failed')
+      console.error('Sale error:', error)
+      toast.error(error.response?.data?.error || 'Failed to complete sale!')
     } finally {
       setLoading(false)
     }
@@ -211,19 +295,18 @@ const Sales = () => {
           <h1 style={{ margin: '0 0 5px', fontSize: '32px', fontWeight: '700', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             🛒 Sales
           </h1>
-          <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>Process sales and manage history</p>
+          <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>Process new sales and view history</p>
         </div>
         {lastSale && (
           <button
             onClick={() => printReceipt(lastSale)}
-            style={{ padding: '12px 25px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}
+            style={{ padding: '12px 25px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
           >
-            🖨️ Print Last Receipt
+            🖨️ Print Receipt
           </button>
         )}
       </div>
 
-      {/* Tabs */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '30px' }}>
         {['new', 'history'].map(tab => (
           <button
@@ -236,9 +319,7 @@ const Sales = () => {
               cursor: 'pointer', 
               background: activeTab === tab ? 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' : '#f0f0f0', 
               color: activeTab === tab ? 'white' : '#333', 
-              fontWeight: '700',
-              fontSize: '14px',
-              boxShadow: activeTab === tab ? '0 4px 15px rgba(240, 147, 251, 0.4)' : 'none'
+              fontWeight: '700'
             }}
           >
             {tab === 'new' ? '🛒 New Sale' : '📋 History'}
@@ -248,25 +329,34 @@ const Sales = () => {
 
       {activeTab === 'new' ? (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '25px' }}>
-          {/* Products Grid */}
           <div>
-            {/* Search Bar */}
-            <input
-              type="text"
-              placeholder="🔍 Search products by name or category..."
-              value={searchQuery}
-              onChange={handleSearch}
-              style={{ 
-                width: '100%', 
-                padding: '14px 20px', 
-                border: '2px solid #e5e7eb', 
-                borderRadius: '12px', 
-                marginBottom: '20px', 
-                boxSizing: 'border-box', 
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-            />
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+              <input
+                type="text"
+                placeholder="🔍 Search products..."
+                value={searchQuery}
+                onChange={handleSearch}
+                style={{ flex: 1, padding: '14px 20px', border: '2px solid #e5e7eb', borderRadius: '12px', fontSize: '14px' }}
+              />
+              <input
+                type="text"
+                placeholder="📦 Barcode or ID..."
+                value={barcodeInput}
+                onChange={handleBarcodeSearch}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && barcodeInput) {
+                    const product = products.find(p => p.id.toString() === barcodeInput)
+                    if (product) {
+                      addToCart(product)
+                      setBarcodeInput('')
+                    } else {
+                      toast.error('Product not found')
+                    }
+                  }
+                }}
+                style={{ width: '280px', padding: '14px 20px', border: '2px solid #667eea', borderRadius: '12px', fontSize: '14px' }}
+              />
+            </div>
 
             <h3 style={{ marginBottom: '15px', fontSize: '16px', fontWeight: '600', color: '#666' }}>Select Products</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
@@ -281,67 +371,61 @@ const Sales = () => {
                     cursor: 'pointer', 
                     boxShadow: '0 2px 8px rgba(0,0,0,0.06)', 
                     border: '2px solid transparent',
-                    position: 'relative'
+                    transition: 'all 0.2s'
                   }}
-                  onMouseOver={e => { e.currentTarget.style.borderColor = '#f093fb'; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 6px 15px rgba(240, 147, 251, 0.25)' }}
-                  onMouseOut={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)' }}
+                  onMouseOver={e => { 
+                    e.currentTarget.style.borderColor = '#f093fb'
+                    e.currentTarget.style.transform = 'translateY(-3px)'
+                  }}
+                  onMouseOut={e => { 
+                    e.currentTarget.style.borderColor = 'transparent'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }}
                 >
-                  <p style={{ margin: '0 0 5px', fontWeight: '700', fontSize: '13px', color: '#333', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product.name}</p>
+                  <p style={{ margin: '0 0 5px', fontWeight: '700', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product.name}</p>
                   <p style={{ margin: '0 0 5px', color: '#888', fontSize: '11px' }}>{product.category}</p>
-                  <p style={{ margin: '0 0 5px', color: '#16a34a', fontWeight: '700', fontSize: '14px' }}>{formatTSh(product.price)}</p>
-                  <p style={{ margin: 0, fontSize: '11px', color: product.stock <= product.low_stock_alert ? '#dc2626' : '#888', fontWeight: product.stock <= product.low_stock_alert ? '700' : '500' }}>
+                  <p style={{ margin: '0 0 5px', color: '#16a34a', fontWeight: '700', fontSize: '14px' }}>{formatTZS(product.price)}</p>
+                  <p style={{ margin: 0, fontSize: '11px', color: product.stock <= product.low_stock_alert ? '#dc2626' : '#888' }}>
                     {product.stock} {product.unit || 'PC'}
                   </p>
                 </div>
               ))}
             </div>
-            {filteredProducts.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
-                <p>No products found</p>
-              </div>
-            )}
           </div>
 
-          {/* Cart */}
           <div style={{ background: 'white', padding: '25px', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', height: 'fit-content', position: 'sticky', top: '20px' }}>
             <h3 style={{ margin: '0 0 25px', fontSize: '20px', fontWeight: '700' }}>🛒 Cart</h3>
 
             {cart.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: '#888' }}>
-                <div style={{ fontSize: '48px', marginBottom: '10px' }}>🛒</div>
-                <p style={{ margin: 0, fontSize: '14px' }}>Cart is empty — click products to add</p>
+                <div style={{ fontSize: '48px' }}>🛒</div>
+                <p style={{ margin: 0 }}>Cart is empty</p>
               </div>
             ) : (
-              <>
-                <div style={{ maxHeight: '280px', overflowY: 'auto', marginBottom: '20px' }}>
-                  {cart.map(item => (
-                    <div key={item.product_id} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid #f0f0f0' }}>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ margin: '0 0 4px', fontWeight: '600', fontSize: '14px' }}>{item.name}</p>
-                        <p style={{ margin: 0, color: '#16a34a', fontSize: '13px', fontWeight: '600' }}>{formatTSh(item.price)}</p>
-                      </div>
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={e => updateQuantity(item.product_id, e.target.value)}
-                        min="1"
-                        style={{ width: '55px', padding: '6px', border: '2px solid #e5e7eb', borderRadius: '8px', textAlign: 'center', fontWeight: '600' }}
-                      />
-                      <button onClick={() => removeFromCart(item.product_id)} style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white', border: 'none', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', fontWeight: '700' }}>✕</button>
+              <div style={{ maxHeight: '280px', overflowY: 'auto', marginBottom: '20px' }}>
+                {cart.map(item => (
+                  <div key={item.product_id} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid #f0f0f0' }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: '0 0 4px', fontWeight: '600', fontSize: '14px' }}>{item.name}</p>
+                      <p style={{ margin: 0, color: '#16a34a', fontSize: '13px', fontWeight: '600' }}>{formatTZS(item.price)}</p>
                     </div>
-                  ))}
-                </div>
-              </>
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      onChange={e => updateQuantity(item.product_id, e.target.value)}
+                      min="1"
+                      style={{ width: '55px', padding: '6px', border: '2px solid #e5e7eb', borderRadius: '8px', textAlign: 'center' }}
+                    />
+                    <button onClick={() => removeFromCart(item.product_id)} style={{ background: '#f5576c', color: 'white', border: 'none', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer' }}>✕</button>
+                  </div>
+                ))}
+              </div>
             )}
 
             <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontSize: '13px', fontWeight: '600' }}>👤 Client (Optional)</label>
-              <select
-                value={selectedClient}
-                onChange={e => setSelectedClient(e.target.value)}
-                style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '500' }}
-              >
-                <option value="">-- Walk-in Customer --</option>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600' }}>👤 Customer</label>
+              <select value={selectedClient} onChange={e => setSelectedClient(e.target.value)} style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px' }}>
+                <option value="">Walk-in Customer</option>
                 {clients.map(client => (
                   <option key={client.id} value={client.id}>{client.name}</option>
                 ))}
@@ -349,42 +433,39 @@ const Sales = () => {
             </div>
 
             <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontSize: '13px', fontWeight: '600' }}>💳 Payment Method</label>
-              <select
-                value={paymentMethod}
-                onChange={e => setPaymentMethod(e.target.value)}
-                style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '500' }}
-              >
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600' }}>💳 Payment</label>
+              <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px' }}>
                 <option value="cash">Cash</option>
-                <option value="card">Card</option>
-                <option value="mobile">Mobile Money</option>
+                <option value="mobile_money">Mobile Money</option>
+                <option value="credit">Credit / Loan</option>
+                <option value="bank_transfer">Bank Transfer</option>
               </select>
             </div>
 
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontSize: '13px', fontWeight: '600' }}>🎁 Discount (USD)</label>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600' }}>🎁 Discount (TSh)</label>
               <input
                 type="number"
                 value={discount}
                 onChange={e => setDiscount(e.target.value)}
                 min="0"
-                step="0.01"
-                style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px', boxSizing: 'border-box', fontSize: '14px', fontWeight: '500' }}
+                placeholder="0"
+                style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px', boxSizing: 'border-box' }}
               />
             </div>
 
-            <div style={{ marginBottom: '20px', padding: '20px', background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
-                <span style={{ color: '#666', fontWeight: '500' }}>Subtotal:</span>
-                <span style={{ fontWeight: '600' }}>{formatTSh(total)}</span>
+            <div style={{ marginBottom: '20px', padding: '20px', background: '#f8f9fa', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <span>Subtotal:</span>
+                <span style={{ fontWeight: '600' }}>{formatTZS(total)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
-                <span style={{ color: '#666', fontWeight: '500' }}>Discount:</span>
-                <span style={{ color: '#dc2626', fontWeight: '600' }}>-{formatTSh(discount)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <span>Discount:</span>
+                <span style={{ color: '#dc2626', fontWeight: '600' }}>-{formatTZS(discount)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '20px', paddingTop: '10px', borderTop: '2px solid #dee2e6' }}>
-                <span>Total:</span>
-                <span style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{formatTSh(finalTotal)}</span>
+                <span>TOTAL:</span>
+                <span style={{ color: '#16a34a' }}>{formatTZS(finalTotal)}</span>
               </div>
             </div>
 
@@ -400,45 +481,37 @@ const Sales = () => {
                 borderRadius: '12px', 
                 cursor: cart.length === 0 ? 'not-allowed' : 'pointer', 
                 fontSize: '16px', 
-                fontWeight: '700',
-                boxShadow: cart.length === 0 ? 'none' : '0 4px 15px rgba(22, 163, 74, 0.4)'
+                fontWeight: '700'
               }}
             >
-              {loading ? '⏳ Processing...' : '✓ Complete Sale'}
+              {loading ? '⏳ Processing...' : '✓ Complete & Print'}
             </button>
           </div>
         </div>
       ) : (
-        /* Sales History */
-        <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+        <div style={{ background: 'white', borderRadius: '16px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)' }}>
-                {['#', 'Client', 'Cashier', 'Total', 'Discount', 'Payment', 'Date'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '18px 20px', color: '#666', fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
+              <tr style={{ background: '#f8f9fa' }}>
+                {['#', 'Customer', 'Cashier', 'Total', 'Discount', 'Payment', 'Date'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '18px 20px', fontWeight: '700', fontSize: '13px' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {sales.map(sale => (
                 <tr key={sale.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '18px 20px', color: '#888', fontWeight: '600' }}>#{sale.id}</td>
-                  <td style={{ padding: '18px 20px', fontWeight: '600' }}>{sale.client_name || 'Walk-in'}</td>
-                  <td style={{ padding: '18px 20px', color: '#888' }}>{sale.cashier_name}</td>
-                  <td style={{ padding: '18px 20px', color: '#16a34a', fontWeight: '700' }}>{formatTSh(sale.total)}</td>
-                  <td style={{ padding: '18px 20px', color: '#dc2626', fontWeight: '600' }}>{formatTSh(sale.discount)}</td>
-                  <td style={{ padding: '18px 20px', textTransform: 'capitalize', fontWeight: '500' }}>{sale.payment_method}</td>
-                  <td style={{ padding: '18px 20px', color: '#888' }}>{new Date(sale.created_at).toLocaleDateString('en-GB')}</td>
+                  <td style={{ padding: '18px 20px' }}>#{sale.id}</td>
+                  <td style={{ padding: '18px 20px' }}>{sale.client_name || 'Walk-in'}</td>
+                  <td style={{ padding: '18px 20px' }}>{sale.cashier_name}</td>
+                  <td style={{ padding: '18px 20px', color: '#16a34a', fontWeight: '700' }}>{formatTZS(sale.total)}</td>
+                  <td style={{ padding: '18px 20px', color: '#dc2626' }}>{formatTZS(sale.discount)}</td>
+                  <td style={{ padding: '18px 20px' }}>{sale.payment_method.replace('_', ' ')}</td>
+                  <td style={{ padding: '18px 20px' }}>{new Date(sale.created_at).toLocaleDateString('en-GB')}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {sales.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>
-              <div style={{ fontSize: '48px', marginBottom: '15px' }}>📋</div>
-              <p style={{ margin: 0, fontSize: '16px', fontWeight: '500' }}>No sales yet!</p>
-            </div>
-          )}
         </div>
       )}
     </div>

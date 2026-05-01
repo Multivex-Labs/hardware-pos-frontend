@@ -3,7 +3,6 @@ import { getProducts, createProduct, updateProduct, deleteProduct } from '../ser
 import toast from 'react-hot-toast'
 
 const emptyForm = { name: '', description: '', price: '', stock: '', unit: 'PC', low_stock_alert: '5', category: '' }
-
 const UNITS = ['PC', 'KG', 'BAG', 'CARTON', 'LITERS', 'METERS', 'BOX']
 
 const Inventory = () => {
@@ -13,7 +12,8 @@ const Inventory = () => {
   const [editId, setEditId] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  const formatTSh = (amount) => `TSh ${(parseFloat(amount || 0) * 2600).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  // 1. Imebadilishwa: Inaonyesha TSh moja kwa moja bila kuzidisha
+  const formatTSh = (amount) => `TSh ${parseFloat(amount || 0).toLocaleString('en-US')}`
 
   const fetchProducts = () => {
     getProducts().then(res => setProducts(res.data)).catch(() => toast.error('Failed to fetch products'))
@@ -61,26 +61,20 @@ const Inventory = () => {
   }
 
   return (
-    <div>
+    <div style={{ padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <div>
           <h1 style={{ margin: '0 0 5px', fontSize: '32px', fontWeight: '700', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             📦 Inventory
           </h1>
-          <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>Manage all your products</p>
+          <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>Manage all your products (Prices in TSh)</p>
         </div>
         <button
           onClick={() => { setShowForm(!showForm); setForm(emptyForm); setEditId(null) }}
-          style={{ 
-            padding: '12px 25px', 
-            background: showForm ? 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' : 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '12px', 
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '14px',
-            boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
+          style={{
+            padding: '12px 25px',
+            background: showForm ? 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' : 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+            color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
           }}
         >
           {showForm ? '✕ Close' : '+ Add Product'}
@@ -94,24 +88,25 @@ const Inventory = () => {
           <form onSubmit={handleSubmit}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               {[
-  { key: 'name', label: 'Product Name' },
-  { key: 'category', label: 'Category' },
-  { key: 'price', label: 'Price (TSh per unit)', multiplier: 2600 },
-  { key: 'stock', label: 'Stock Quantity' },
-  { key: 'low_stock_alert', label: 'Low Stock Alert' },
-].map(({ key, label, multiplier }) => (
-  <div key={key}>
-    <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontWeight: '600', fontSize: '14px' }}>{label}</label>
-    <input
-      type={['price', 'stock', 'low_stock_alert'].includes(key) ? 'number' : 'text'}
-      step={key === 'price' ? '100' : '1'}
-      value={key === 'price' && form[key] ? (parseFloat(form[key]) * (multiplier || 1)).toFixed(0) : form[key]}
-      onChange={e => setForm({ ...form, [key]: key === 'price' ? (parseFloat(e.target.value) / (multiplier || 1)).toFixed(4) : e.target.value })}
-      style={{ width: '100%', padding: '12px', border: '2px solid #e5e7eb', borderRadius: '10px', boxSizing: 'border-box', fontSize: '14px', fontWeight: '500' }}
-      required={['name', 'price'].includes(key)}
-    />
-  </div>
-))}
+                { key: 'name', label: 'Product Name' },
+                { key: 'category', label: 'Category' },
+                { key: 'price', label: 'Price (TSh)' }, // Imeondolewa multiplier
+                { key: 'stock', label: 'Stock Quantity' },
+                { key: 'low_stock_alert', label: 'Low Stock Alert' },
+              ].map(({ key, label }) => (
+                <div key={key}>
+                  <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontWeight: '600', fontSize: '14px' }}>{label}</label>
+                  <input
+                    type={['price', 'stock', 'low_stock_alert'].includes(key) ? 'number' : 'text'}
+                    // 2. Imebadilishwa: Thamani inachukuliwa kama ilivyo
+                    value={form[key]} 
+                    onChange={e => setForm({ ...form, [key]: e.target.value })}
+                    style={{ width: '100%', padding: '12px', border: '2px solid #e5e7eb', borderRadius: '10px', boxSizing: 'border-box', fontSize: '14px', fontWeight: '500' }}
+                    required={['name', 'price'].includes(key)}
+                  />
+                </div>
+              ))}
+              {/* Unit and Description fields remain the same... */}
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontWeight: '600', fontSize: '14px' }}>Unit</label>
                 <select
@@ -184,5 +179,4 @@ const Inventory = () => {
     </div>
   )
 }
-
 export default Inventory
