@@ -21,7 +21,6 @@ const Sales = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [barcodeInput, setBarcodeInput] = useState('')
 
-  // ✅ CORRECT TZS FORMATTING - NO CONVERSION!
   const formatTZS = (amount) => {
     const num = parseFloat(amount || 0)
     return `TSh ${num.toLocaleString('en-US', { 
@@ -82,7 +81,7 @@ const Sales = () => {
     const existing = cart.find(item => item.product_id === product.id)
     if (existing) {
       if (existing.quantity >= product.stock) {
-        toast.error(`Insufficient stock - only ${product.stock} available`)
+        toast.error(`Only ${product.stock} available`)
         return
       }
       setCart(cart.map(item =>
@@ -94,7 +93,7 @@ const Sales = () => {
       setCart([...cart, { 
         product_id: product.id, 
         name: product.name, 
-        price: parseFloat(product.price), 
+        price: parseFloat(product.price),
         quantity: 1,
         unit: product.unit || 'PC'
       }])
@@ -111,7 +110,7 @@ const Sales = () => {
     if (qty < 1) return
     const product = products.find(p => p.id === product_id)
     if (qty > product.stock) {
-      toast.error(`Stock only has ${product.stock} items`)
+      toast.error(`Only ${product.stock} available`)
       return
     }
     setCart(cart.map(item =>
@@ -122,10 +121,35 @@ const Sales = () => {
   const total = cart.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0)
   const finalTotal = total - parseFloat(discount || 0)
 
+  // ✅ NEW: Print receipt from sale history
+  const printReceiptFromHistory = async (sale) => {
+    try {
+      // Fetch sale items from backend
+      const response = await fetch(`http://localhost:5000/api/sales/${sale.id}`)
+      const data = await response.json()
+      
+      const saleData = {
+        saleId: sale.id,
+        total: parseFloat(sale.total),
+        discount: parseFloat(sale.discount || 0),
+        paymentMethod: sale.payment_method,
+        items: data.items || [],
+        cashierName: sale.cashier_name || 'CASHIER',
+        clientName: sale.client_name || 'WALK-IN'
+      }
+      
+      printReceipt(saleData)
+    } catch (error) {
+      console.error('Error fetching sale details:', error)
+      toast.error('Failed to load receipt data')
+    }
+  }
+
   const printReceipt = (saleData) => {
     try {
       const doc = new jsPDF()
       
+      // Header
       doc.setFontSize(20)
       doc.setFont('helvetica', 'bold')
       doc.text('PIUS HARDWARE', 105, 20, { align: 'center' })
@@ -133,7 +157,7 @@ const Sales = () => {
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
       doc.text('P.O.BOX 4629, MBEYA TANZANIA', 105, 28, { align: 'center' })
-      doc.text('Phone: 0764067682 / 0759494763 / 0756146747', 105, 34, { align: 'center' })
+      doc.text('Tel: 0764067682 / 0759494763 / 0756146747', 105, 34, { align: 'center' })
       
       doc.setFontSize(14)
       doc.setFont('helvetica', 'bold')
@@ -141,6 +165,7 @@ const Sales = () => {
       
       doc.line(20, 50, 190, 50)
       
+      // Details
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
       const now = new Date()
@@ -149,9 +174,10 @@ const Sales = () => {
       doc.text(`Customer: ${saleData.clientName || 'WALK-IN'}`, 20, 70)
       doc.text(`Cashier: ${saleData.cashierName || 'CASHIER'}`, 20, 76)
       
+      // Items
       const tableData = saleData.items.map((item, i) => [
         i + 1,
-        item.name,
+        item.name || item.product_name,
         item.unit || 'PC',
         item.quantity,
         parseFloat(item.price).toFixed(2),
@@ -160,7 +186,7 @@ const Sales = () => {
       
       doc.autoTable({
         startY: 82,
-        head: [['#', 'Product', 'Unit', 'Qty', 'Price (TSh)', 'Total (TSh)']],
+        head: [['#', 'Item', 'Unit', 'Qty', 'Price (TSh)', 'Total (TSh)']],
         body: tableData,
         theme: 'striped',
         headStyles: { 
@@ -185,6 +211,7 @@ const Sales = () => {
       
       const finalY = doc.lastAutoTable.finalY + 10
       
+      // Totals
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
       
@@ -197,23 +224,28 @@ const Sales = () => {
         doc.text(`-TSh ${parseFloat(saleData.discount).toFixed(2)}`, 190, finalY + 6, { align: 'right' })
       }
       
+      // Grand Total
       doc.setFontSize(13)
       doc.setFont('helvetica', 'bold')
       const yPos = finalY + (saleData.discount > 0 ? 15 : 9)
       doc.text('GRAND TOTAL:', 130, yPos)
       doc.text(`TSh ${parseFloat(saleData.total).toFixed(2)}`, 190, yPos, { align: 'right' })
       
+      // Payment
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      doc.text(`Payment: ${saleData.paymentMethod.toUpperCase().replace('_', ' ')}`, 105, yPos + 12, { align: 'center' })
+      const paymentText = saleData.paymentMethod.replace('_', ' ').toUpperCase()
+      doc.text(`Payment: ${paymentText}`, 105, yPos + 12, { align: 'center' })
       
+      // Footer
       doc.setFont('helvetica', 'italic')
       doc.setFontSize(11)
-      doc.text('BUILD WITH PIUS HARDWARE', 105, yPos + 25, { align: 'center' })
+      doc.text('JENGA NA PIUS HARDWARE', 105, yPos + 25, { align: 'center' })
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(9)
-      doc.text('Thank you for your purchase!', 105, yPos + 32, { align: 'center' })
+      doc.text('Thank you for your business!', 105, yPos + 32, { align: 'center' })
       
+      // Print
       const pdfBlob = doc.output('blob')
       const pdfUrl = URL.createObjectURL(pdfBlob)
       const printWindow = window.open(pdfUrl, '_blank')
@@ -222,20 +254,20 @@ const Sales = () => {
         printWindow.onload = () => {
           setTimeout(() => printWindow.print(), 250)
         }
-        toast.success('✓ Receipt ready!')
+        toast.success('✓ Receipt ready to print!')
       } else {
-        toast.error('Please allow pop-ups first!')
+        toast.error('Please allow pop-ups!')
       }
       
     } catch (error) {
       console.error('Print error:', error)
-      toast.error('Failed: ' + error.message)
+      toast.error('Failed to print: ' + error.message)
     }
   }
 
   const handleSale = async () => {
     if (cart.length === 0) {
-      toast.error('Add products first!')
+      toast.error('Add items to cart first!')
       return
     }
     
@@ -270,7 +302,7 @@ const Sales = () => {
       }
       
       setLastSale(saleData)
-      toast.success('✓ Sale completed successfully!')
+      toast.success('✓ Sale completed!')
       
       setTimeout(() => printReceipt(saleData), 500)
       
@@ -282,7 +314,7 @@ const Sales = () => {
       loadData()
     } catch (error) {
       console.error('Sale error:', error)
-      toast.error(error.response?.data?.error || 'Failed to complete sale!')
+      toast.error(error.response?.data?.error || 'Sale failed')
     } finally {
       setLoading(false)
     }
@@ -295,14 +327,14 @@ const Sales = () => {
           <h1 style={{ margin: '0 0 5px', fontSize: '32px', fontWeight: '700', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             🛒 Sales
           </h1>
-          <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>Process new sales and view history</p>
+          <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>Process sales and manage history</p>
         </div>
         {lastSale && (
           <button
             onClick={() => printReceipt(lastSale)}
             style={{ padding: '12px 25px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}
           >
-            🖨️ Print Receipt
+            🖨️ Print Last Receipt
           </button>
         )}
       </div>
@@ -437,7 +469,7 @@ const Sales = () => {
               <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px' }}>
                 <option value="cash">Cash</option>
                 <option value="mobile_money">Mobile Money</option>
-                <option value="credit">Credit / Loan</option>
+                <option value="credit">Credit</option>
                 <option value="bank_transfer">Bank Transfer</option>
               </select>
             </div>
@@ -493,7 +525,7 @@ const Sales = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f8f9fa' }}>
-                {['#', 'Customer', 'Cashier', 'Total', 'Discount', 'Payment', 'Date'].map(h => (
+                {['#', 'Customer', 'Cashier', 'Total', 'Discount', 'Payment', 'Date', 'Receipt'].map(h => (
                   <th key={h} style={{ textAlign: 'left', padding: '18px 20px', fontWeight: '700', fontSize: '13px' }}>{h}</th>
                 ))}
               </tr>
@@ -506,8 +538,25 @@ const Sales = () => {
                   <td style={{ padding: '18px 20px' }}>{sale.cashier_name}</td>
                   <td style={{ padding: '18px 20px', color: '#16a34a', fontWeight: '700' }}>{formatTZS(sale.total)}</td>
                   <td style={{ padding: '18px 20px', color: '#dc2626' }}>{formatTZS(sale.discount)}</td>
-                  <td style={{ padding: '18px 20px' }}>{sale.payment_method.replace('_', ' ')}</td>
+                  <td style={{ padding: '18px 20px', textTransform: 'capitalize' }}>{sale.payment_method.replace('_', ' ')}</td>
                   <td style={{ padding: '18px 20px' }}>{new Date(sale.created_at).toLocaleDateString('en-GB')}</td>
+                  <td style={{ padding: '18px 20px' }}>
+                    <button
+                      onClick={() => printReceiptFromHistory(sale)}
+                      style={{ 
+                        padding: '8px 16px', 
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '8px', 
+                        cursor: 'pointer', 
+                        fontSize: '12px',
+                        fontWeight: '600'
+                      }}
+                    >
+                      🖨️ Print
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
