@@ -91,7 +91,7 @@ const Clients = () => {
             boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
           }}
         >
-          {showForm ? '✕ Funga' : '+ Ongeza Client'}
+          {showForm ? '✕ Close' : '+ Add Client'}
         </button>
       </div>
 
@@ -120,8 +120,8 @@ const Clients = () => {
           <form onSubmit={handleSubmit}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               {[
-                { key: 'name', label: 'Jina la Mteja', required: true },
-                { key: 'phone', label: 'Namba ya Simu' },
+                { key: 'name', label: 'Customer Name', required: true },
+                { key: 'phone', label: 'Phone Number' },
                 { key: 'email', label: 'Email' },
                 { key: 'address', label: 'Anakotoka' },
               ].map(({ key, label, required }) => (
@@ -142,7 +142,7 @@ const Clients = () => {
               disabled={loading}
               style={{ marginTop: '25px', padding: '14px 35px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '15px' }}
             >
-              {loading ? '⏳ Inahifadhi...' : editId ? '✓ Hifadhi Mabadiliko' : '✓ Unda Client'}
+              {loading ? '⏳ Saving...' : editId ? '✓ Save Changes' : '✓ Create Client'}
             </button>
           </form>
         </div>
@@ -153,7 +153,7 @@ const Clients = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)' }}>
-              {['Jina', 'Simu', 'Email', 'Address', 'Actions'].map(h => (
+              {['Name', 'Phone', 'Email', 'Address', 'Actions'].map(h => (
                 <th key={h} style={{ textAlign: 'left', padding: '18px 20px', color: '#666', fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
               ))}
             </tr>

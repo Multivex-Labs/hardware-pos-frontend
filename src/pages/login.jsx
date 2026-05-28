@@ -66,7 +66,7 @@ const Login = () => {
   }}>
     PIUS HARDWARE
   </h1>
-  <p style={{ margin: 0, color: '#888', fontSize: '14px', fontWeight: '500' }}>Ingia kwenye system yako</p>
+  <p style={{ margin: 0, color: '#888', fontSize: '14px', fontWeight: '500' }}>Sign in to your account</p>
 </div>
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '22px' }}>
@@ -126,7 +126,7 @@ const Login = () => {
               boxShadow: loading ? 'none' : '0 4px 15px rgba(102, 126, 234, 0.4)'
             }}
           >
-            {loading ? '⏳ Inapakia...' : '✓ Ingia Sasa'}
+            {loading ? '⏳ Signing in...' : '✓ Sign In'}
           </button>
         </form>
       </div>

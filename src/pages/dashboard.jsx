@@ -31,7 +31,7 @@ const Dashboard = () => {
           <h1 style={{ margin: '0 0 5px', fontSize: '32px', fontWeight: '700', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             Dashboard
           </h1>
-          <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>Karibu! — Leo ni {new Date().toLocaleDateString('sw-TZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>Welcome! Today is {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
       </div>
 
@@ -41,21 +41,21 @@ const Dashboard = () => {
           <div style={{ position: 'absolute', top: '-20px', right: '-20px', fontSize: '80px', opacity: '0.1' }}>🛒</div>
           <p style={{ margin: '0 0 8px', fontSize: '13px', opacity: '0.9', fontWeight: '500' }}>Leo Sales</p>
           <h2 style={{ margin: 0, fontSize: '36px', fontWeight: '700' }}>{todayStats?.total_sales || 0}</h2>
-          <p style={{ margin: '5px 0 0', fontSize: '12px', opacity: '0.8' }}>Mauzo ya leo</p>
+          <p style={{ margin: '5px 0 0', fontSize: '12px', opacity: '0.8' }}>Today's sales</p>
         </div>
 
         <div style={{ ...cardStyle, background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
           <div style={{ position: 'absolute', top: '-20px', right: '-20px', fontSize: '80px', opacity: '0.1' }}>💰</div>
-          <p style={{ margin: '0 0 8px', fontSize: '13px', opacity: '0.9', fontWeight: '500' }}>Revenue ya Leo</p>
+          <p style={{ margin: '0 0 8px', fontSize: '13px', opacity: '0.9', fontWeight: '500' }}>Today's Revenue</p>
           <h2 style={{ margin: 0, fontSize: '28px', fontWeight: '700' }}>{formatTSh(todayStats?.revenue)}</h2>
-          <p style={{ margin: '5px 0 0', fontSize: '12px', opacity: '0.8' }}>Mapato ya leo</p>
+          <p style={{ margin: '5px 0 0', fontSize: '12px', opacity: '0.8' }}>Revenue earned today</p>
         </div>
 
         <div style={{ ...cardStyle, background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' }}>
           <div style={{ position: 'absolute', top: '-20px', right: '-20px', fontSize: '80px', opacity: '0.1' }}>⚠️</div>
           <p style={{ margin: '0 0 8px', fontSize: '13px', opacity: '0.9', fontWeight: '500' }}>Low Stock Items</p>
           <h2 style={{ margin: 0, fontSize: '36px', fontWeight: '700' }}>{lowStock.length}</h2>
-          <p style={{ margin: '5px 0 0', fontSize: '12px', opacity: '0.8' }}>Bidhaa zenye stock chini</p>
+          <p style={{ margin: '5px 0 0', fontSize: '12px', opacity: '0.8' }}>Low stock products</p>
         </div>
       </div>
 
@@ -63,13 +63,13 @@ const Dashboard = () => {
       {lowStock.length > 0 && (
         <div style={{ background: 'linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%)', border: '2px solid #fca5a5', borderRadius: '16px', padding: '25px', marginBottom: '30px', boxShadow: '0 4px 15px rgba(252, 165, 165, 0.2)' }}>
           <h3 style={{ margin: '0 0 20px', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '20px', fontWeight: '600' }}>
-            <span style={{ fontSize: '24px' }}>⚠️</span> Bidhaa Zenye Stock Chini
+            <span style={{ fontSize: '24px' }}>⚠️</span> Low Stock Alert
           </h3>
           <div style={{ background: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' }}>
-                  <th style={{ textAlign: 'left', padding: '15px 20px', color: '#666', fontWeight: '600' }}>Bidhaa</th>
+                  <th style={{ textAlign: 'left', padding: '15px 20px', color: '#666', fontWeight: '600' }}>Product</th>
                   <th style={{ textAlign: 'left', padding: '15px 20px', color: '#666', fontWeight: '600' }}>Stock</th>
                   <th style={{ textAlign: 'left', padding: '15px 20px', color: '#666', fontWeight: '600' }}>Alert Level</th>
                 </tr>
@@ -103,7 +103,7 @@ const Dashboard = () => {
             <tbody>
               {sevenDays.map((day, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '15px 20px', fontWeight: '500' }}>{new Date(day.date).toLocaleDateString('sw-TZ')}</td>
+                  <td style={{ padding: '15px 20px', fontWeight: '500' }}>{new Date(day.date).toLocaleDateString('en-US')}</td>
                   <td style={{ padding: '15px 20px' }}>{day.total_sales}</td>
                   <td style={{ padding: '15px 20px', color: '#16a34a', fontWeight: '600' }}>{formatTSh(day.revenue)}</td>
                 </tr>
