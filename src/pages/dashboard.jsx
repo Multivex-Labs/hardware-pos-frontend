@@ -7,79 +7,62 @@ const Dashboard = () => {
   const [lowStock, setLowStock] = useState([])
 
   useEffect(() => {
-    getTodayReport().then(res => setTodayStats(res.data)).catch(() => {})
-    getLastSevenDays().then(res => setSevenDays(res.data)).catch(() => {})
-    getLowStock().then(res => setLowStock(res.data)).catch(() => {})
+    getTodayReport().then(r => setTodayStats(r.data)).catch(() => {})
+    getLastSevenDays().then(r => setSevenDays(r.data)).catch(() => {})
+    getLowStock().then(r => setLowStock(r.data)).catch(() => {})
   }, [])
 
-  const formatTSh = (amount) => `TSh ${(parseFloat(amount || 0) * 2600).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-
-  const cardStyle = {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '25px',
-    borderRadius: '16px',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-    color: 'white',
-    position: 'relative',
-    overflow: 'hidden'
-  }
+  const fmt = (amount) => `TSh ${parseFloat(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 
   return (
     <div>
-      <div style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="page-header">
         <div>
-          <h1 style={{ margin: '0 0 5px', fontSize: '32px', fontWeight: '700', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <h1 style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             Dashboard
           </h1>
-          <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>Welcome! Today is {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          <p style={{ color: '#888', fontSize: '13px', marginTop: '4px' }}>
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '30px' }}>
-        <div style={{ ...cardStyle, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-          <div style={{ position: 'absolute', top: '-20px', right: '-20px', fontSize: '80px', opacity: '0.1' }}>🛒</div>
-          <p style={{ margin: '0 0 8px', fontSize: '13px', opacity: '0.9', fontWeight: '500' }}>Leo Sales</p>
-          <h2 style={{ margin: 0, fontSize: '36px', fontWeight: '700' }}>{todayStats?.total_sales || 0}</h2>
-          <p style={{ margin: '5px 0 0', fontSize: '12px', opacity: '0.8' }}>Today's sales</p>
-        </div>
-
-        <div style={{ ...cardStyle, background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
-          <div style={{ position: 'absolute', top: '-20px', right: '-20px', fontSize: '80px', opacity: '0.1' }}>💰</div>
-          <p style={{ margin: '0 0 8px', fontSize: '13px', opacity: '0.9', fontWeight: '500' }}>Today's Revenue</p>
-          <h2 style={{ margin: 0, fontSize: '28px', fontWeight: '700' }}>{formatTSh(todayStats?.revenue)}</h2>
-          <p style={{ margin: '5px 0 0', fontSize: '12px', opacity: '0.8' }}>Revenue earned today</p>
-        </div>
-
-        <div style={{ ...cardStyle, background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' }}>
-          <div style={{ position: 'absolute', top: '-20px', right: '-20px', fontSize: '80px', opacity: '0.1' }}>⚠️</div>
-          <p style={{ margin: '0 0 8px', fontSize: '13px', opacity: '0.9', fontWeight: '500' }}>Low Stock Items</p>
-          <h2 style={{ margin: 0, fontSize: '36px', fontWeight: '700' }}>{lowStock.length}</h2>
-          <p style={{ margin: '5px 0 0', fontSize: '12px', opacity: '0.8' }}>Low stock products</p>
-        </div>
+      {/* Stat Cards */}
+      <div className="grid-3" style={{ marginBottom: '24px' }}>
+        {[
+          { label: 'Sales Today', value: todayStats?.total_sales || 0, grad: 'linear-gradient(135deg,#667eea,#764ba2)', icon: '🛒' },
+          { label: "Today's Revenue", value: fmt(todayStats?.revenue), grad: 'linear-gradient(135deg,#f093fb,#f5576c)', icon: '💰' },
+          { label: 'Low Stock Items', value: lowStock.length, grad: 'linear-gradient(135deg,#fa709a,#fee140)', icon: '⚠️' },
+        ].map(({ label, value, grad, icon }) => (
+          <div key={label} className="stat-card" style={{ background: grad }}>
+            <div style={{ position: 'absolute', top: '-15px', right: '-15px', fontSize: '70px', opacity: 0.1 }}>{icon}</div>
+            <p style={{ margin: '0 0 6px', fontSize: '12px', opacity: 0.9, fontWeight: '500' }}>{label}</p>
+            <h2 style={{ margin: 0, fontSize: '28px', fontWeight: '700' }}>{value}</h2>
+          </div>
+        ))}
       </div>
 
-      {/* Low Stock Warning */}
+      {/* Low Stock Alert */}
       {lowStock.length > 0 && (
-        <div style={{ background: 'linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%)', border: '2px solid #fca5a5', borderRadius: '16px', padding: '25px', marginBottom: '30px', boxShadow: '0 4px 15px rgba(252, 165, 165, 0.2)' }}>
-          <h3 style={{ margin: '0 0 20px', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '20px', fontWeight: '600' }}>
-            <span style={{ fontSize: '24px' }}>⚠️</span> Low Stock Alert
+        <div className="card" style={{ background: '#fff5f5', border: '2px solid #fca5a5', marginBottom: '24px' }}>
+          <h3 style={{ margin: '0 0 16px', color: '#dc2626', fontSize: '16px', fontWeight: '700' }}>
+            ⚠️ Low Stock Alert
           </h3>
-          <div style={{ background: 'white', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="table-wrapper">
+            <table>
               <thead>
-                <tr style={{ background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' }}>
-                  <th style={{ textAlign: 'left', padding: '15px 20px', color: '#666', fontWeight: '600' }}>Product</th>
-                  <th style={{ textAlign: 'left', padding: '15px 20px', color: '#666', fontWeight: '600' }}>Stock</th>
-                  <th style={{ textAlign: 'left', padding: '15px 20px', color: '#666', fontWeight: '600' }}>Alert Level</th>
+                <tr style={{ background: '#fef2f2' }}>
+                  {['Product', 'Stock', 'Min Level'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '12px 16px', color: '#666', fontWeight: '600', fontSize: '13px' }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {lowStock.map(product => (
-                  <tr key={product.id} style={{ borderBottom: '1px solid #fee2e2' }}>
-                    <td style={{ padding: '15px 20px', fontWeight: '500' }}>{product.name}</td>
-                    <td style={{ padding: '15px 20px', color: '#dc2626', fontWeight: 'bold', fontSize: '16px' }}>{product.stock}</td>
-                    <td style={{ padding: '15px 20px', color: '#888' }}>{product.low_stock_alert}</td>
+                {lowStock.map(p => (
+                  <tr key={p.id} style={{ borderBottom: '1px solid #fee2e2' }}>
+                    <td style={{ padding: '12px 16px', fontWeight: '500', fontSize: '14px' }}>{p.name}</td>
+                    <td style={{ padding: '12px 16px', color: '#dc2626', fontWeight: '700' }}>{p.stock}</td>
+                    <td style={{ padding: '12px 16px', color: '#888', fontSize: '13px' }}>{p.low_stock_alert}</td>
                   </tr>
                 ))}
               </tbody>
@@ -89,23 +72,26 @@ const Dashboard = () => {
       )}
 
       {/* Last 7 Days */}
-      <div style={{ background: 'white', padding: '30px', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
-        <h3 style={{ margin: '0 0 20px', fontSize: '20px', fontWeight: '600', color: '#333' }}>📊 Sales — Siku 7 Zilizopita</h3>
-        <div style={{ background: 'white', borderRadius: '12px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="card">
+        <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: '700' }}>📊 Last 7 Days</h3>
+        <div className="table-wrapper">
+          <table>
             <thead>
-              <tr style={{ background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)' }}>
-                <th style={{ textAlign: 'left', padding: '15px 20px', color: '#666', fontWeight: '600' }}>Tarehe</th>
-                <th style={{ textAlign: 'left', padding: '15px 20px', color: '#666', fontWeight: '600' }}>Sales</th>
-                <th style={{ textAlign: 'left', padding: '15px 20px', color: '#666', fontWeight: '600' }}>Revenue</th>
+              <tr style={{ background: '#f8f9fa' }}>
+                {['Date', 'Sales', 'Revenue'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '12px 16px', color: '#666', fontWeight: '600', fontSize: '13px' }}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
+              {sevenDays.length === 0 && (
+                <tr><td colSpan={3} style={{ padding: '20px', textAlign: 'center', color: '#aaa' }}>No data yet</td></tr>
+              )}
               {sevenDays.map((day, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '15px 20px', fontWeight: '500' }}>{new Date(day.date).toLocaleDateString('en-US')}</td>
-                  <td style={{ padding: '15px 20px' }}>{day.total_sales}</td>
-                  <td style={{ padding: '15px 20px', color: '#16a34a', fontWeight: '600' }}>{formatTSh(day.revenue)}</td>
+                  <td style={{ padding: '12px 16px', fontSize: '14px' }}>{new Date(day.date).toLocaleDateString('en-US')}</td>
+                  <td style={{ padding: '12px 16px', fontWeight: '600' }}>{day.total_sales}</td>
+                  <td style={{ padding: '12px 16px', color: '#16a34a', fontWeight: '700' }}>{fmt(day.revenue)}</td>
                 </tr>
               ))}
             </tbody>
