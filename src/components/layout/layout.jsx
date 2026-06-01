@@ -25,14 +25,14 @@ const Layout = () => {
   const navigate = (path) => {
     if (allowed.includes(path)) {
       setActivePage(path)
-      setSidebarOpen(false) // Close sidebar on mobile after navigation
+      setSidebarOpen(false)
     }
   }
 
   const renderPage = () => {
     if (!allowed.includes(activePage)) {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', fontFamily: 'Poppins, sans-serif', padding: '20px', textAlign: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', textAlign: 'center', padding: '20px' }}>
           <div style={{ fontSize: '60px', marginBottom: '20px' }}>🚫</div>
           <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '10px' }}>Access Denied</h2>
           <p style={{ color: '#6b7280', fontSize: '14px' }}>You do not have permission to view this page.</p>
@@ -52,90 +52,79 @@ const Layout = () => {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', position: 'relative' }}>
-
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div
-          onClick={() => setSidebarOpen(false)}
-          style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 40,
-            display: 'block'
-          }}
-        />
-      )}
-
-      {/* Sidebar */}
-      <div style={{
-        position: 'fixed',
-        top: 0, left: 0, bottom: 0,
-        zIndex: 50,
-        transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
-        transition: 'transform 0.3s ease',
-        width: '260px',
-      }}
-        className="sidebar-wrapper"
-      >
-        <Sidebar activePage={activePage} setActivePage={navigate} />
-      </div>
-
-      {/* Desktop sidebar — always visible on large screens */}
-      <div style={{ width: '260px', flexShrink: 0 }} className="sidebar-desktop">
-        <div style={{ position: 'fixed', top: 0, left: 0, bottom: 0, width: '260px' }}>
-          <Sidebar activePage={activePage} setActivePage={navigate} />
-        </div>
-      </div>
-
-      {/* Main content */}
-      <main style={{ flex: 1, background: '#f5f5f5', minHeight: '100vh', width: '100%' }}>
-
-        {/* Mobile top bar */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '15px',
-          padding: '15px 20px',
-          background: 'white',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 30,
-        }} className="mobile-topbar">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            style={{
-              background: 'none', border: 'none',
-              cursor: 'pointer', padding: '5px',
-              fontSize: '22px', lineHeight: 1
-            }}
-          >
-            ☰
-          </button>
-          <span style={{ fontWeight: '700', fontSize: '16px', fontFamily: 'Poppins, sans-serif' }}>
-            PIUS HARDWARE
-          </span>
-        </div>
-
-        <div style={{ padding: '20px' }}>
-          {renderPage()}
-        </div>
-      </main>
-
-      {/* Responsive CSS */}
+    <>
       <style>{`
-        @media (min-width: 768px) {
-          .sidebar-wrapper { transform: translateX(0) !important; position: relative !important; }
-          .sidebar-desktop { display: block !important; }
-          .mobile-topbar { display: none !important; }
-        }
+        .pos-layout { display: flex; min-height: 100vh; }
+        .pos-sidebar-desktop { width: 260px; flex-shrink: 0; position: relative; }
+        .pos-sidebar-desktop > div { position: fixed; top: 0; left: 0; bottom: 0; width: 260px; }
+        .pos-sidebar-mobile { display: none; }
+        .pos-overlay { display: none; }
+        .pos-topbar { display: none; }
+        .pos-main { flex: 1; background: #f5f5f5; min-height: 100vh; overflow-x: hidden; }
+        .pos-content { padding: 30px; }
+
         @media (max-width: 767px) {
-          .sidebar-desktop { display: none !important; }
-          .mobile-topbar { display: flex !important; }
+          .pos-sidebar-desktop { display: none; }
+          .pos-topbar { 
+            display: flex; align-items: center; gap: 15px;
+            padding: 14px 20px; background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            position: sticky; top: 0; z-index: 30;
+          }
+          .pos-topbar button {
+            background: none; border: none; cursor: pointer;
+            font-size: 24px; padding: 0; line-height: 1;
+          }
+          .pos-topbar span { font-weight: 700; font-size: 16px; }
+          .pos-sidebar-mobile {
+            display: block;
+            position: fixed; top: 0; left: 0; bottom: 0; width: 260px;
+            z-index: 50;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+          }
+          .pos-sidebar-mobile.open { transform: translateX(0); }
+          .pos-overlay {
+            display: block;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 40;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s ease;
+          }
+          .pos-overlay.open { opacity: 1; pointer-events: all; }
+          .pos-content { padding: 16px; }
         }
       `}</style>
-    </div>
+
+      <div className="pos-layout">
+        {/* Desktop sidebar */}
+        <div className="pos-sidebar-desktop">
+          <div><Sidebar activePage={activePage} setActivePage={navigate} /></div>
+        </div>
+
+        {/* Mobile overlay */}
+        <div className={`pos-overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
+
+        {/* Mobile sidebar */}
+        <div className={`pos-sidebar-mobile ${sidebarOpen ? 'open' : ''}`}>
+          <Sidebar activePage={activePage} setActivePage={navigate} />
+        </div>
+
+        {/* Main */}
+        <main className="pos-main">
+          {/* Mobile topbar */}
+          <div className="pos-topbar">
+            <button onClick={() => setSidebarOpen(true)}>☰</button>
+            <span>PIUS HARDWARE</span>
+          </div>
+
+          <div className="pos-content">
+            {renderPage()}
+          </div>
+        </main>
+      </div>
+    </>
   )
 }
 
