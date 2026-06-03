@@ -35,6 +35,12 @@ export const deleteClient = (id) => API.delete(`/clients/${id}`)
 export const searchClients = (query) => API.get(`/clients/search?query=${query}`)
 export const getClientHistory = (id) => API.get(`/clients/${id}/history`)
 
+// Client — features mpya za credit na payments
+export const getClientProfile = (id) => API.get(`/clients/${id}/profile`)
+export const getClientPayments = (id) => API.get(`/clients/${id}/payments`)
+export const recordClientPayment = (id, data) => API.post(`/clients/${id}/payments`, data)
+export const updateCreditLimit = (id, credit_limit) => API.patch(`/clients/${id}/credit-limit`, { credit_limit })
+
 // Sales
 export const getSales = () => API.get('/sales')
 export const getSale = (id) => API.get(`/sales/${id}`)
