@@ -35,11 +35,11 @@ export const deleteClient = (id) => API.delete(`/clients/${id}`)
 export const searchClients = (query) => API.get(`/clients/search?query=${query}`)
 export const getClientHistory = (id) => API.get(`/clients/${id}/history`)
 
-// Client — features mpya za credit na payments
+// Clients — features mpya
 export const getClientProfile = (id) => API.get(`/clients/${id}/profile`)
 export const getClientPayments = (id) => API.get(`/clients/${id}/payments`)
 export const recordClientPayment = (id, data) => API.post(`/clients/${id}/payments`, data)
-export const updateCreditLimit = (id, credit_limit) => API.patch(`/clients/${id}/credit-limit`, { credit_limit })
+export const updateCreditLimit = (id, data) => API.patch(`/clients/${id}/credit-limit`, data)
 
 // Sales
 export const getSales = () => API.get('/sales')
