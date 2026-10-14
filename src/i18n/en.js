@@ -1,0 +1,163 @@
+// English translations. Structure is deliberately flat-nested (dot-path lookup)
+// so adding sw.js later means copying this file and translating values only —
+// no component code changes needed.
+export default {
+  common: {
+    back: 'Back',
+    cancel: 'Cancel',
+    save: 'Save',
+    saving: 'Saving...',
+    close: 'Close',
+    search: 'Search',
+    loading: 'Loading...',
+    optional: '(optional)',
+  },
+
+  sales: {
+    title: 'Sales',
+    subtitleHub: 'Choose what you want to do',
+    subtitleActive: 'Process sales and view history',
+    addDepositBtn: 'Add Deposit',
+    backToMenu: 'Back to Menu',
+
+    hub: {
+      newSale: { title: 'New Sale', desc: 'Sell products — Cash, Credit or Deposit' },
+      history: { title: 'Track / Search Receipt', desc: 'Find and view past receipts, reprint anytime' },
+      returns: { title: 'Returns / Refunds', desc: 'Process a product return and issue a refund' },
+      edit: { title: 'Edit Receipt', desc: 'Modify a completed receipt (Manager only)' },
+      credit: { title: 'Credit Sales', desc: 'View all sales made on credit' },
+      deposits: { title: 'Deposits', desc: 'View client deposits, record a new one' },
+      editComingSoon: 'Edit Receipt is coming soon!',
+    },
+
+    mode: { cash: 'Cash', credit: 'Credit', deposit: 'Deposit' },
+
+    searchProducts: 'Search products...',
+    scanPlaceholder: 'ID / Barcode',
+    outOfStock: 'is out of stock',
+    onlyAvailable: (n) => `Only ${n} available`,
+    productNotFound: 'Product not found',
+
+    cart: 'Cart',
+    cartEmpty: 'Cart is empty',
+    priceType: { retail: 'Retail', wholesale: 'Wholesale', wholesaleNA: 'Wholesale (N/A)', custom: 'Custom' },
+    noWholesalePrice: (name) => `${name} has no wholesale price set`,
+
+    customer: 'Customer',
+    customerRegistered: 'Registered Client',
+    customerWalkin: 'Walk-in',
+    selectClient: 'Walk-in Customer',
+    walkinPlaceholder: 'Type customer name (optional)',
+    walkinDefaultName: 'Walk-in Customer',
+
+    payment: 'Payment Method',
+    amountReceived: 'Amount Received (TZS)',
+    change: 'Change',
+    insufficientAmount: 'Amount received is less than the total',
+    discount: 'Discount (TZS)',
+    subtotal: 'Subtotal',
+    total: 'TOTAL',
+
+    completeSale: 'Complete Sale',
+    sellOnCredit: 'Sell on Credit',
+    useDeposit: 'Use Deposit',
+    processing: 'Processing...',
+
+    hold: {
+      button: 'Hold Sale',
+      badge: (n) => `Held (${n})`,
+      modalTitle: '📥 Held Sales',
+      empty: 'No held sales',
+      resume: 'Resume',
+      delete: 'Delete',
+      success: 'Sale held — cart cleared for the next customer',
+      resumed: 'Sale resumed',
+      cartEmpty: 'Cart is empty — nothing to hold',
+    },
+
+    creditOk: 'Credit Available',
+    creditNotOk: 'Insufficient Credit',
+    depositOk: 'Deposit Available',
+    depositNotOk: 'Insufficient Deposit',
+    limit: 'Limit',
+    available: 'Available',
+    depositBalance: 'Deposit Balance',
+
+    saleComplete: (id) => `Sale #${id} complete`,
+    printReceipt: '🖨️ Print Receipt',
+
+    trackSearchPlaceholder: 'Search by Sale ID or customer name...',
+
+    table: {
+      id: '#', customer: 'Customer', cashier: 'Cashier', type: 'Type',
+      total: 'Total', discount: 'Discount', date: 'Date', receipt: 'Receipt',
+      noSales: 'No sales yet',
+    },
+    print: '🖨️ Print',
+
+    void: {
+      button: 'Void',
+      badge: 'VOIDED',
+      modalTitle: '⚠️ Void Sale',
+      modalSubtitle: (id) => `This will cancel Sale #${id}, restore stock, and reverse any credit or deposit effects. This cannot be undone.`,
+      reasonLabel: 'Reason for voiding *',
+      reasonPlaceholder: 'e.g. Entered by mistake, wrong items, duplicate sale...',
+      confirm: 'Void Sale',
+      voiding: 'Voiding...',
+      needReason: 'Please enter a reason',
+    },
+
+    addDepositModal: {
+      title: '💰 Add Deposit',
+      subtitle: "Customer is paying in advance — we'll hold it and print a receipt",
+      selectClient: 'Select Client *',
+      amount: 'Amount (TZS) *',
+      method: 'Payment Method',
+      reference: 'Reference',
+      save: '✓ Save & Print',
+    },
+  },
+
+  returns: {
+    title: '↩️ Returns / Refunds',
+    subtitle: 'Search a receipt, select items to return and the refund method',
+    searchPlaceholder: 'Search by Sale ID or customer name...',
+    table: { id: '#', customer: 'Customer', type: 'Type', total: 'Total', date: 'Date' },
+    choose: 'Select',
+    noMatch: 'No matching receipts',
+    backToList: '← Back to list',
+    loadingReceipt: (id) => `Loading receipt #${id}...`,
+    receiptHeader: (id, name) => `Receipt #${id} — ${name}`,
+    itemsTable: { product: 'Product', price: 'Price', sold: 'Sold', returned: 'Returned', returnable: 'Returnable', qty: 'Return Qty' },
+    reasonLabel: 'Reason (per item, optional)',
+    chooseReason: '-- Choose reason --',
+    refundMethod: 'Refund Method',
+    refundCash: '💵 Cash Refund',
+    refundStoreCredit: '🏦 Store Credit (Client Deposit)',
+    refundExchange: '🔄 Exchange (different item)',
+    storeCreditWarning: '⚠️ This is a Walk-in receipt — Store Credit requires a registered client',
+    notesLabel: 'Additional Notes',
+    notesPlaceholder: 'Any extra notes...',
+    refundTotal: 'Refund Total:',
+    submit: '✓ Complete Return',
+    submitting: '⏳ Processing...',
+    pickAtLeastOne: 'Select at least one item to return',
+    needRegisteredClient: 'Store Credit requires a registered client',
+    maxReturnable: (n) => `Maximum returnable: ${n}`,
+  },
+
+  auditLog: {
+    title: '🕵️ Audit Log',
+    subtitle: 'A record of every sensitive action taken in the system',
+    noAccess: 'Only Managers and Admins can view the audit log',
+    table: { date: 'Date & Time', user: 'User', action: 'Action', record: 'Record', reason: 'Reason', details: '' },
+    viewDetails: 'View',
+    noLogs: 'No activity recorded yet',
+    detailsTitle: (id) => `Audit Entry #${id}`,
+    before: 'Before',
+    after: 'After',
+    actionLabels: { VOID_SALE: 'Voided Sale' },
+    filterAll: 'All actions',
+    searchPlaceholder: 'Search by user name...',
+  },
+}

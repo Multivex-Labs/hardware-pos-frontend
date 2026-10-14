@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useLanguage } from '../../context/LanguageContext'
+import { useState, useEffect } from 'react'
+import { Menu } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
 import Sidebar from './sidebar'
 import Dashboard from '../../pages/dashboard'
 import Sales from '../../pages/sales'
@@ -8,42 +11,75 @@ import Clients from '../../pages/clients'
 import Reports from '../../pages/Reports'
 import Settings from '../../pages/settings'
 import Purchases from '../../pages/Purchases'
+import Expenses from '../../pages/Expenses'
+import Procurement from '../../pages/Procurement'
+import DispensingRegister from '../../pages/DispensingRegister' // MPYA - Pharmacy
 
+const EXPANDED = 220
+const COLLAPSED = 72
+
+// Settings (biashara, watumiaji, data) inabaki kwa admin pekee.
+// Rangi/theme ni mapendeleo ya mtu binafsi: kila role anaipata kupitia menu ya mtumiaji (chini ya sidebar) → Appearance.
 const rolePages = {
-  admin:   ['/', '/sales', '/inventory', '/purchases', '/clients', '/reports', '/settings'],
-  manager: ['/', '/sales', '/inventory', '/purchases', '/clients', '/reports'],
-  cashier: ['/', '/sales', '/inventory'],
+  admin:   ['/', '/sales', '/inventory', '/dispensing', '/purchases', '/procurement', '/expenses', '/clients', '/reports', '/settings'],
+  manager: ['/', '/sales', '/inventory', '/dispensing', '/purchases', '/procurement', '/expenses', '/clients', '/reports'],
+  cashier: ['/', '/sales', '/inventory', '/dispensing'],
+}
+
+// Hali ya sidebar inakumbukwa. Kama hakuna chaguo lililohifadhiwa, skrini ndogo (<1100px) inaanza ikiwa imefungwa.
+const readCollapsed = () => {
+  const saved = localStorage.getItem('pos-sidebar-collapsed')
+  if (saved !== null) return saved === '1'
+  return typeof window !== 'undefined' && window.innerWidth < 1100
 }
 
 const Layout = () => {
+  const { t } = useLanguage()
   const { user } = useAuth()
+  const { colors } = useTheme()
   const [activePage, setActivePage] = useState('/')
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)    // drawer ya simu
+  const [collapsed, setCollapsed] = useState(readCollapsed) // rail ya desktop
   const role = user?.role || 'cashier'
   const allowed = rolePages[role] || rolePages['cashier']
+  const width = collapsed ? COLLAPSED : EXPANDED
 
   const navigate = (path) => {
-    if (allowed.includes(path)) {
-      setActivePage(path)
-      setSidebarOpen(false)
-    }
+    if (allowed.includes(path)) { setActivePage(path); setSidebarOpen(false) }
   }
 
-  const renderPage = () => {
-    if (!allowed.includes(activePage)) {
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', textAlign: 'center', padding: '20px' }}>
-          <div style={{ fontSize: '60px', marginBottom: '20px' }}>🚫</div>
-          <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '10px' }}>Access Denied</h2>
-          <p style={{ color: '#6b7280', fontSize: '14px' }}>You do not have permission to view this page.</p>
-        </div>
-      )
+  const toggleCollapsed = () => {
+    setCollapsed(c => {
+      const next = !c
+      localStorage.setItem('pos-sidebar-collapsed', next ? '1' : '0')
+      return next
+    })
+  }
+
+  // Ctrl+B (au Cmd+B) = kunja/fungua sidebar
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') { e.preventDefault(); toggleCollapsed() }
     }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  const renderPage = () => {
+    if (!allowed.includes(activePage)) return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', textAlign: 'center' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '6px', color: colors.text }}>{t('shell.accessDenied')}</h2>
+        <p style={{ fontSize: '14px', color: colors.textMuted }}>{t('shell.noPermission')}</p>
+      </div>
+    )
     switch (activePage) {
       case '/': return <Dashboard />
       case '/sales': return <Sales />
       case '/inventory': return <Inventory />
+      case '/dispensing': return <DispensingRegister />
       case '/purchases': return <Purchases />
+      case '/procurement': return <Procurement />
+      case '/expenses': return <Expenses />
       case '/clients': return <Clients />
       case '/reports': return <Reports />
       case '/settings': return <Settings />
@@ -52,79 +88,62 @@ const Layout = () => {
   }
 
   return (
-    <>
-      <style>{`
-        .pos-layout { display: flex; min-height: 100vh; }
-        .pos-sidebar-desktop { width: 260px; flex-shrink: 0; position: relative; }
-        .pos-sidebar-desktop > div { position: fixed; top: 0; left: 0; bottom: 0; width: 260px; }
-        .pos-sidebar-mobile { display: none; }
-        .pos-overlay { display: none; }
-        .pos-topbar { display: none; }
-        .pos-main { flex: 1; background: #f5f5f5; min-height: 100vh; overflow-x: hidden; }
-        .pos-content { padding: 30px; }
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'transparent' }}>
 
+      {/* Sidebar — desktop (rail inayofunguka/kufungwa) */}
+      <div className="pos-sidebar-desktop" style={{ width: `${width}px`, flexShrink: 0, position: 'relative', display: 'flex', transition: 'width 0.22s ease' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, bottom: 0, width: `${width}px`, zIndex: 20, transition: 'width 0.22s ease' }}>
+          <Sidebar activePage={activePage} setActivePage={navigate} collapsed={collapsed} onToggle={toggleCollapsed} />
+        </div>
+      </div>
+
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div className="scrim" onClick={() => setSidebarOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+      )}
+
+      {/* Sidebar — mobile drawer */}
+      <div className="pos-sidebar-mobile" style={{
+        position: 'fixed', top: 0, left: 0, bottom: 0, width: `${EXPANDED}px`, zIndex: 50,
+        transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.22s ease',
+        boxShadow: sidebarOpen ? colors.shadowLg : 'none',
+      }}>
+        <Sidebar activePage={activePage} setActivePage={navigate} onClose={() => setSidebarOpen(false)} />
+      </div>
+
+      {/* Main content */}
+      <main style={{ flex: 1, minWidth: 0, background: 'transparent', minHeight: '100vh' }}>
+        {/* Mobile topbar */}
+        <div className="pos-topbar glass" style={{
+          display: 'none', alignItems: 'center', gap: '12px', height: '52px', padding: '0 12px',
+          borderTop: 'none', borderLeft: 'none', borderRight: 'none', position: 'sticky', top: 0, zIndex: 30,
+        }}>
+          <button onClick={() => setSidebarOpen(true)} aria-label={t('shell.openMenu')} className="btn" style={{ width: '38px', height: '38px', padding: 0 }}>
+            <Menu size={20} strokeWidth={1.75} />
+          </button>
+          <span style={{ fontWeight: '600', fontSize: '15px', color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {localStorage.getItem('businessName') || 'POS'}
+          </span>
+        </div>
+
+        <div className="pos-content" style={{ padding: '24px' }}>
+          {renderPage()}
+        </div>
+      </main>
+
+      <style>{`
+        @keyframes pageIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+        .pos-content > * { animation: pageIn 0.2s ease; }
         @media (max-width: 767px) {
-          .pos-sidebar-desktop { display: none; }
-          .pos-topbar { 
-            display: flex; align-items: center; gap: 15px;
-            padding: 14px 20px; background: white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            position: sticky; top: 0; z-index: 30;
-          }
-          .pos-topbar button {
-            background: none; border: none; cursor: pointer;
-            font-size: 24px; padding: 0; line-height: 1;
-          }
-          .pos-topbar span { font-weight: 700; font-size: 16px; }
-          .pos-sidebar-mobile {
-            display: block;
-            position: fixed; top: 0; left: 0; bottom: 0; width: 260px;
-            z-index: 50;
-            transform: translateX(-100%);
-            transition: transform 0.3s ease;
-          }
-          .pos-sidebar-mobile.open { transform: translateX(0); }
-          .pos-overlay {
-            display: block;
-            position: fixed; inset: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 40;
-            opacity: 0; pointer-events: none;
-            transition: opacity 0.3s ease;
-          }
-          .pos-overlay.open { opacity: 1; pointer-events: all; }
-          .pos-content { padding: 16px; }
+          .pos-sidebar-desktop { display: none !important; }
+          .pos-topbar { display: flex !important; }
+          .pos-content { padding: 16px !important; }
+        }
+        @media (min-width: 768px) {
+          .pos-sidebar-mobile { display: none; }
         }
       `}</style>
-
-      <div className="pos-layout">
-        {/* Desktop sidebar */}
-        <div className="pos-sidebar-desktop">
-          <div><Sidebar activePage={activePage} setActivePage={navigate} /></div>
-        </div>
-
-        {/* Mobile overlay */}
-        <div className={`pos-overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)} />
-
-        {/* Mobile sidebar */}
-        <div className={`pos-sidebar-mobile ${sidebarOpen ? 'open' : ''}`}>
-          <Sidebar activePage={activePage} setActivePage={navigate} />
-        </div>
-
-        {/* Main */}
-        <main className="pos-main">
-          {/* Mobile topbar */}
-          <div className="pos-topbar">
-            <button onClick={() => setSidebarOpen(true)}>☰</button>
-            <span>PIUS HARDWARE</span>
-          </div>
-
-          <div className="pos-content">
-            {renderPage()}
-          </div>
-        </main>
-      </div>
-    </>
+    </div>
   )
 }
 

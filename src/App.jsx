@@ -1,28 +1,25 @@
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { LanguageProvider } from './context/LanguageContext'
 import Login from './pages/login.jsx'
 import Layout from './components/layout/layout.jsx'
 import { Toaster } from 'react-hot-toast'
+import SplashScreen from './components/SplashScreen'
 
 const AppContent = () => {
   const { user, loading } = useAuth()
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1e1e2e' }}>
-        <h2 style={{ color: 'white' }}>Inapakia...</h2>
-      </div>
-    )
-  }
-
+  if (loading) return <SplashScreen />
   return user ? <Layout /> : <Login />
 }
 
 const App = () => {
   return (
-    <AuthProvider>
-      <Toaster position="top-right" />
-      <AppContent />
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <Toaster position="top-right" />
+        <AppContent />
+      </AuthProvider>
+    </LanguageProvider>
   )
 }
 

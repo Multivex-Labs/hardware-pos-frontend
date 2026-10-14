@@ -13,6 +13,7 @@
     "axios": "^1.15.2",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
+    "lucide-react": "^1.51.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-hot-toast": "^2.6.0",

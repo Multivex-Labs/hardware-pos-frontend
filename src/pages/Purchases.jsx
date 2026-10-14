@@ -1,280 +1,124 @@
 import { useState, useEffect } from 'react'
-import { getProducts, getPurchases, createPurchase } from '../services/api'
-import { useAuth } from '../context/AuthContext'
+import { PackagePlus, Banknote, Plus } from 'lucide-react'
+import { getPurchases, createPurchase, getProducts } from '../services/api'
 import toast from 'react-hot-toast'
+import Modal from '../components/Modal'
+
+const fmtTZS = (v) => `TSh ${parseFloat(v || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 
 const Purchases = () => {
-  const { user } = useAuth()
-  const [products, setProducts] = useState([])
   const [purchases, setPurchases] = useState([])
-  const [formData, setFormData] = useState({
-    product_id: '',
-    quantity: '',
-    cost_per_unit: '',
-    supplier: '',
-    notes: ''
-  })
+  const [products, setProducts] = useState([])
+  const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
-
-  // ✅ FIXED: TZS formatting - NO USD conversion
-  const formatTZS = (amount) => {
-    const num = parseFloat(amount || 0)
-    return `TSh ${num.toLocaleString('en-US', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    })}`
-  }
+  const [form, setForm] = useState({ product_id: '', quantity: '', cost_per_unit: '', supplier: '', notes: '' })
 
   useEffect(() => {
-    loadData()
+    getPurchases().then(r => setPurchases(r.data)).catch(() => {})
+    getProducts().then(r => setProducts(r.data)).catch(() => {})
   }, [])
-
-  const loadData = () => {
-    getProducts()
-      .then(res => setProducts(res.data))
-      .catch(() => toast.error('Failed to load products'))
-    
-    getPurchases()
-      .then(res => setPurchases(res.data))
-      .catch(() => {})
-  }
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
-    if (!formData.product_id || !formData.quantity || !formData.cost_per_unit) {
-      toast.error('Please fill in all required fields!')
-      return
-    }
-
+    if (!form.product_id || !form.quantity || !form.cost_per_unit) { toast.error('Fill in product, quantity and price'); return }
     setLoading(true)
     try {
-      await createPurchase({
-        ...formData,
-        quantity: parseInt(formData.quantity),
-        cost_per_unit: parseFloat(formData.cost_per_unit),
-        total_cost: parseInt(formData.quantity) * parseFloat(formData.cost_per_unit)
-      })
-      
-      toast.success('✓ Purchase registered successfully!')
-      
-      setFormData({
-        product_id: '',
-        quantity: '',
-        cost_per_unit: '',
-        supplier: '',
-        notes: ''
-      })
-      
-      loadData()
-    } catch (error) {
-      console.error('Purchase error:', error)
-      toast.error(error.response?.data?.error || 'Failed!')
-    } finally {
-      setLoading(false)
-    }
+      await createPurchase({ ...form, quantity: parseFloat(form.quantity), cost_per_unit: parseFloat(form.cost_per_unit) })
+      toast.success('✓ Purchase recorded! Stock updated.')
+      setForm({ product_id: '', quantity: '', cost_per_unit: '', supplier: '', notes: '' })
+      setShowForm(false)
+      getPurchases().then(r => setPurchases(r.data))
+      getProducts().then(r => setProducts(r.data))
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed')
+    } finally { setLoading(false) }
   }
 
-  const selectedProduct = products.find(p => p.id == formData.product_id)
-  const totalCost = formData.quantity && formData.cost_per_unit 
-    ? parseInt(formData.quantity) * parseFloat(formData.cost_per_unit)
-    : 0
+  const now = new Date()
+  const thisMonth = purchases.filter(p => { const d = new Date(p.created_at); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() })
+  const thisMonthTotal = thisMonth.reduce((s, p) => s + parseFloat(p.total_cost || 0), 0)
 
   return (
-    <div>
-      <div style={{ marginBottom: '25px' }}>
-        <h1 style={{ margin: '0 0 5px', fontSize: '32px', fontWeight: '700', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-          📦 Purchases
-        </h1>
-        <p style={{ margin: 0, color: '#888', fontSize: '14px' }}>Record purchases from suppliers</p>
+    <div style={{ color: 'var(--text)' }}>
+      <div className="page-header">
+        <div>
+          <h1>Purchases</h1>
+          <p>Record purchases and update stock</p>
+        </div>
+        <button className="btn-primary" onClick={() => setShowForm(true)}>
+          <Plus size={16} strokeWidth={2} /> New purchase
+        </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: '25px' }}>
-        {/* Form */}
-        <div style={{ background: 'white', padding: '25px', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', height: 'fit-content' }}>
-          <h3 style={{ margin: '0 0 25px', fontSize: '20px', fontWeight: '700' }}>New Purchase</h3>
-          
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontSize: '13px', fontWeight: '600' }}>
-                📦 Product *
-              </label>
-              <select
-                name="product_id"
-                value={formData.product_id}
-                onChange={handleChange}
-                required
-                style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', fontWeight: '500' }}
-              >
-                <option value="">-- Select product --</option>
-                {products.map(product => (
-                  <option key={product.id} value={product.id}>
-                    {product.name} (Stock: {product.stock} {product.unit})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontSize: '13px', fontWeight: '600' }}>
-                🔢 Quantity *
-              </label>
-              <input
-                type="number"
-                name="quantity"
-                value={formData.quantity}
-                onChange={handleChange}
-                min="1"
-                required
-                placeholder="Enter quantity"
-                style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px', boxSizing: 'border-box', fontSize: '14px', fontWeight: '500' }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontSize: '13px', fontWeight: '600' }}>
-                💰 Cost per unit (TSh) *
-              </label>
-              <input
-                type="number"
-                name="cost_per_unit"
-                value={formData.cost_per_unit}
-                onChange={handleChange}
-                min="0"
-                step="0.01"
-                required
-                placeholder="Purchase price per unit"
-                style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px', boxSizing: 'border-box', fontSize: '14px', fontWeight: '500' }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontSize: '13px', fontWeight: '600' }}>
-                🏢 Supplier
-              </label>
-              <input
-                type="text"
-                name="supplier"
-                value={formData.supplier}
-                onChange={handleChange}
-                placeholder="Supplier name"
-                style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px', boxSizing: 'border-box', fontSize: '14px', fontWeight: '500' }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#333', fontSize: '13px', fontWeight: '600' }}>
-                📝 Notes
-              </label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                rows="3"
-                placeholder="Additional notes (optional)"
-                style={{ width: '100%', padding: '10px', border: '2px solid #e5e7eb', borderRadius: '10px', boxSizing: 'border-box', fontSize: '14px', fontWeight: '500', fontFamily: 'inherit', resize: 'vertical' }}
-              />
-            </div>
-
-            {totalCost > 0 && (
-              <div style={{ marginBottom: '20px', padding: '15px', background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)', borderRadius: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '14px', color: '#666' }}>Product:</span>
-                  <span style={{ fontSize: '14px', fontWeight: '600' }}>{selectedProduct?.name}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '14px', color: '#666' }}>Quantity:</span>
-                  <span style={{ fontSize: '14px', fontWeight: '600' }}>{formData.quantity} {selectedProduct?.unit}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '14px', color: '#666' }}>Price per unit:</span>
-                  <span style={{ fontSize: '14px', fontWeight: '600' }}>{formatTZS(formData.cost_per_unit)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '10px', borderTop: '2px solid #dee2e6' }}>
-                  <span style={{ fontSize: '16px', fontWeight: '700' }}>TOTAL:</span>
-                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#16a34a' }}>{formatTZS(totalCost)}</span>
-                </div>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              style={{ 
-                width: '100%', 
-                padding: '14px', 
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '12px', 
-                cursor: loading ? 'not-allowed' : 'pointer', 
-                fontSize: '16px', 
-                fontWeight: '700',
-                boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)'
-              }}
-            >
-              {loading ? '⏳ Registering...' : '✓ Register Purchase'}
-            </button>
-          </form>
+      <div className="stats-row">
+        <div className="stat">
+          <Banknote className="stat-icon" size={88} strokeWidth={1.25} aria-hidden="true" />
+          <p className="stat-label">Purchases this month</p>
+          <p className="stat-value">{fmtTZS(thisMonthTotal)}</p>
         </div>
+        <div className="stat">
+          <PackagePlus className="stat-icon" size={88} strokeWidth={1.25} aria-hidden="true" />
+          <p className="stat-label">Records this month</p>
+          <p className="stat-value">{thisMonth.length.toLocaleString()}</p>
+        </div>
+      </div>
 
-        {/* Purchase History */}
-        <div style={{ background: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-          <div style={{ padding: '20px', borderBottom: '1px solid #f0f0f0' }}>
-            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Purchase History</h3>
-          </div>
-          
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)' }}>
-                  {['Date', 'Product', 'Quantity', 'Price/Unit', 'Total', 'Supplier'].map(h => (
-                    <th key={h} style={{ textAlign: 'left', padding: '18px 20px', color: '#666', fontWeight: '700', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {purchases.map(purchase => (
-                  <tr key={purchase.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                    <td style={{ padding: '18px 20px', color: '#888', fontSize: '14px' }}>
-                      {new Date(purchase.created_at).toLocaleDateString('en-US')}
-                    </td>
-                    <td style={{ padding: '18px 20px', fontWeight: '600', fontSize: '14px' }}>
-                      {purchase.product_name}
-                    </td>
-                    <td style={{ padding: '18px 20px', fontSize: '14px' }}>
-                      {purchase.quantity} {purchase.unit}
-                    </td>
-                    <td style={{ padding: '18px 20px', color: '#667eea', fontWeight: '600', fontSize: '14px' }}>
-                      {formatTZS(purchase.cost_per_unit)}
-                    </td>
-                    <td style={{ padding: '18px 20px', color: '#16a34a', fontWeight: '700', fontSize: '14px' }}>
-                      {formatTZS(purchase.total_cost)}
-                    </td>
-                    <td style={{ padding: '18px 20px', fontSize: '14px', color: '#888' }}>
-                      {purchase.supplier || '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            
-            {purchases.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>
-                <div style={{ fontSize: '48px', marginBottom: '15px' }}>📦</div>
-                <p style={{ margin: 0, fontSize: '16px', fontWeight: '500' }}>No purchases yet!</p>
+      <Modal open={showForm} onClose={() => setShowForm(false)} title="Record new purchase" subtitle="Stock is updated automatically" size="lg">
+          <form onSubmit={handleSubmit}>
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label">Product *</label>
+                <select className="form-input" value={form.product_id} onChange={e => setForm({ ...form, product_id: e.target.value })} required>
+                  <option value="">-- Select product --</option>
+                  {products.map(p => <option key={p.id} value={p.id}>{p.name} (Stock: {p.stock})</option>)}
+                </select>
               </div>
-            )}
-          </div>
+              <div className="form-group">
+                <label className="form-label">Quantity *</label>
+                <input className="form-input mono" type="number" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} placeholder="e.g. 50" min="0.01" step="0.01" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Purchase price (TSh) *</label>
+                <input className="form-input mono" type="number" value={form.cost_per_unit} onChange={e => setForm({ ...form, cost_per_unit: e.target.value })} placeholder="e.g. 11000" min="0" step="0.01" required />
+                {form.cost_per_unit && form.quantity && (
+                  <p className="form-hint mono">Total: {fmtTZS(parseFloat(form.cost_per_unit) * parseFloat(form.quantity))}</p>
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Supplier</label>
+                <input className="form-input" value={form.supplier} onChange={e => setForm({ ...form, supplier: e.target.value })} placeholder="e.g. Dangote" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Notes</label>
+                <input className="form-input" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Additional notes" />
+              </div>
+            </div>
+            <div className="modal-actions sticky">
+              <button type="submit" className="btn-primary" disabled={loading}>{loading ? 'Recording...' : 'Record and update stock'}</button>
+              <button type="button" className="btn" onClick={() => setShowForm(false)}>Cancel</button>
+            </div>
+          </form>
+      </Modal>
+
+      <div className="table-card">
+        <div className="table-wrapper">
+          <table className="data-table" style={{ minWidth: '640px' }}>
+            <thead>
+              <tr><th>Product</th><th className="num">Qty</th><th className="num">Unit price</th><th className="num">Total</th><th>Supplier</th><th>Date</th></tr>
+            </thead>
+            <tbody>
+              {purchases.length === 0 && <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-subtle)' }}>No purchases yet.</td></tr>}
+              {purchases.map(p => (
+                <tr key={p.id}>
+                  <td style={{ fontWeight: '500' }}>{p.product_name || p.name}</td>
+                  <td className="num mono">{parseFloat(p.quantity).toLocaleString()}</td>
+                  <td className="num mono" style={{ color: 'var(--text-muted)' }}>{fmtTZS(p.cost_per_unit)}</td>
+                  <td className="num mono" style={{ fontWeight: '600' }}>{fmtTZS(p.total_cost)}</td>
+                  <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{p.supplier || '—'}</td>
+                  <td style={{ fontSize: '13px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{new Date(p.created_at).toLocaleDateString('en-GB')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

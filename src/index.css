@@ -1,138 +1,523 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: 'Poppins', sans-serif;
+/* ═════════════════════════════════════════════════════════════
+   MULTIVEX POS — Design system
+   Source of truth baada ya app kupakia: ThemeContext.jsx (inaset --variables).
+   Values hapa chini ni fallback ya first paint tu (hakuna flicker).
+   Majina ya variables lazima yalingane na ThemeContext (surface2 → --surface-2).
+   ═════════════════════════════════════════════════════════════ */
+
+:root {
+  --bg: #F6F7F9;
+  --surface: #FFFFFF;
+  --surface-2: #F9FAFB;
+  --surface-3: #F2F4F7;
+  --border: #E4E7EC;
+  --border-light: #EAECF0;
+  --input-bg: #FFFFFF;
+  --table-head: #F9FAFB;
+  --text: #1D2939;
+  --text-muted: #667085;
+  --text-subtle: #98A2B3;
+  --primary: #2D3139;
+  --primary-hover: #15181D;
+  --primary-soft: #E6E9ED;
+  --on-primary: #FFFFFF;
+  --success: #15803D;
+  --success-soft: #E8F5EC;
+  --warning: #B45309;
+  --warning-soft: #FEF4E6;
+  --danger: #B42318;
+  --danger-soft: #FDECEA;
+  --shadow: 0 1px 2px rgba(16,24,40,0.05);
+  --shadow-lg: 0 4px 12px rgba(16,24,40,0.10);
+
+  /* Spacing & shape — tumia hizi tu, si namba za nasibu */
+  --radius: 6px;
+  --radius-lg: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
 }
+
+[data-theme="dark"] {
+  --bg: #0F1419;
+  --surface: #161B22;
+  --surface-2: #1B2129;
+  --surface-3: #212830;
+  --border: #2D343D;
+  --border-light: #252C34;
+  --input-bg: #1B2129;
+  --table-head: #1B2129;
+  --text: #D5DDE5;
+  --text-muted: #8B96A3;
+  --text-subtle: #5F6B78;
+  --primary: #E6EAEE;
+  --primary-hover: #FFFFFF;
+  --primary-soft: #262C34;
+  --on-primary: #14181D;
+  --success: #3FB06A;
+  --success-soft: #14301F;
+  --warning: #D99A3D;
+  --warning-soft: #33260F;
+  --danger: #EF6A5E;
+  --danger-soft: #3A1A17;
+  --shadow: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.45);
+}
+
+/* ── Base ── */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
 
 body {
-  background: #f5f5f5;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
-button, input, select, div {
-  transition: all 0.2s ease;
+/* Font moja kila mahali — !important inashinda inline 'Poppins' iliyobaki kwenye pages za zamani.
+   Ondoa !important hii baada ya pages zote kusafishwa. */
+body, button, input, select, textarea, table {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif !important;
 }
 
-button:hover:not(:disabled) {
-  transform: translateY(-1px);
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+/* Transitions: ndogo na za kusudi (rangi tu). Hakuna "transition: all", hakuna hover-lift. */
+body { transition: background-color 0.3s ease, color 0.3s ease; }
+
+button, input, select, textarea, a {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease,
+              box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+.card, .stat, .table-card, .badge {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.2s ease;
 }
 
-/* ── Responsive Grid Utilities ── */
-.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+/* Button feedback: inapanda 1px ukiiweka mouse, inarudi ukiibonyeza */
+button:hover:not(:disabled) { transform: translateY(-1px); }
+button:active:not(:disabled) { transform: translateY(0); }
+
+/* Modal: fade + scale ndogo */
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalIn { from { opacity: 0; transform: scale(0.98) translateY(4px); } to { opacity: 1; transform: none; } }
+.modal-overlay { animation: fadeIn 0.15s ease; }
+.modal { animation: modalIn 0.18s ease; }
+
+/* ── Namba / bei ──
+   Zamani: Courier New. Sasa: Inter na tabular-nums ili tarakimu zipangike wima kwenye tables.
+   Class jina lile lile (.mono) → hakuna page inayohitaji edit. */
+.mono, .num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.num { text-align: right; }
+
+/* ── Layout helpers ── */
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4); }
 
 @media (max-width: 1024px) {
   .grid-4 { grid-template-columns: repeat(2, 1fr); }
   .grid-3 { grid-template-columns: repeat(2, 1fr); }
 }
-
 @media (max-width: 640px) {
   .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
 }
 
-/* ── Responsive Tables ── */
-.table-wrapper {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  border-radius: 12px;
-}
-
-.table-wrapper table {
-  width: 100%;
-  min-width: 500px;
-  border-collapse: collapse;
-}
-
-/* ── Responsive Cards ── */
-.card {
-  background: white;
-  padding: 25px;
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-  margin-bottom: 24px;
-}
-
-@media (max-width: 640px) {
-  .card { padding: 16px; }
-}
-
-/* ── Page Header ── */
+/* ── Page header ── */
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: var(--space-5);
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--space-3);
 }
-
-.page-header h1 {
-  font-size: 28px;
-  font-weight: 700;
-}
-
+.page-header h1 { font-size: 20px; font-weight: 600; line-height: 1.3; color: var(--text); }
+.page-header p  { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
 @media (max-width: 640px) {
-  .page-header h1 { font-size: 22px; }
-  .page-header { margin-bottom: 16px; }
+  .page-header { margin-bottom: var(--space-4); }
+  .page-header h1 { font-size: 18px; }
 }
 
-/* ── Buttons ── */
-.btn-primary {
-  padding: 11px 20px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 600;
+/* ── Cards (tumia tu pale zinapoboresha ugroup wa taarifa) ── */
+.card {
+  background: var(--surface);
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+  margin-bottom: var(--space-4);
+}
+.card-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: var(--space-3); }
+@media (max-width: 640px) { .card { padding: var(--space-4); } }
+
+/* ── Buttons ──
+   Primary = action kuu (moja kwa screen). Secondary = kimya. Danger = kufuta/void tu. */
+.btn, .btn-primary, .btn-secondary, .btn-danger, .btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   font-size: 14px;
-  font-family: 'Poppins', sans-serif;
+  font-weight: 500;
+  line-height: 1;
   white-space: nowrap;
-}
-
-.btn-danger {
-  padding: 11px 20px;
-  background: linear-gradient(135deg, #dc2626, #991b1b);
-  color: white;
-  border: none;
-  border-radius: 10px;
   cursor: pointer;
-  font-weight: 600;
-  font-size: 14px;
-  font-family: 'Poppins', sans-serif;
 }
+.btn-primary { background: var(--primary); color: var(--on-primary); }
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+
+.btn, .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+.btn:hover:not(:disabled), .btn-secondary:hover:not(:disabled) { background: var(--surface-3); }
+
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { filter: brightness(0.92); }
+
+.btn-ghost { background: transparent; color: var(--text-muted); }
+.btn-ghost:hover:not(:disabled) { background: var(--surface-3); color: var(--text); }
+
+.btn-sm { height: 30px; padding: 0 10px; font-size: 13px; }
+.btn-lg { height: 48px; padding: 0 20px; font-size: 16px; font-weight: 600; }  /* Complete Sale */
+.btn-block { width: 100%; }
+
+.btn:disabled, .btn-primary:disabled, .btn-secondary:disabled,
+.btn-danger:disabled, .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Forms ── */
-.form-input {
+.form-group { margin-bottom: var(--space-4); }
+.form-label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--text); }
+.form-hint  { margin-top: 4px; font-size: 12px; color: var(--text-muted); }
+.form-error { margin-top: 4px; font-size: 12px; color: var(--danger); }
+
+.form-input, select.form-input, textarea.form-input {
   width: 100%;
-  padding: 10px 14px;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 8px;
+  height: 38px;
+  padding: 0 12px;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   font-size: 14px;
-  font-family: 'Poppins', sans-serif;
   outline: none;
-  box-sizing: border-box;
 }
-
+textarea.form-input { height: auto; padding: 8px 12px; }
+.form-input::placeholder { color: var(--text-subtle); }
 .form-input:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102,126,234,0.15);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
+.form-input.is-invalid { border-color: var(--danger); }
 
-/* ── Stat Cards ── */
-.stat-card {
-  padding: 20px;
-  border-radius: 16px;
-  color: white;
-  position: relative;
+/* ── Tables ──
+   .table-wrapper = scroll container (kama zamani, hakuna border).
+   .table-card    = container yenye border kwa table inayosimama pekee.
+   .data-table    = styling ya table yenyewe (kwa pages mpya). */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table-wrapper table { width: 100%; min-width: 500px; border-collapse: collapse; }
+
+.table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
-@media (max-width: 640px) {
-  .stat-card { padding: 16px; }
-  .stat-card h2 { font-size: 24px !important; }
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th {
+  text-align: left;
+  padding: 10px 14px;
+  background: var(--table-head);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 14px;
+  color: var(--text);
+  vertical-align: middle;
+}
+.data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover { background: var(--surface-2); }
+.data-table th.num, .data-table td.num { text-align: right; }
+.data-table .actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+/* ── Badges (status) ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.badge-ok, .badge-success, .badge-cash    { background: var(--success-soft); color: var(--success); }
+.badge-low, .badge-warning, .badge-credit { background: var(--warning-soft); color: var(--warning); }
+.badge-out, .badge-danger                 { background: var(--danger-soft);  color: var(--danger); }
+.badge-deposit, .badge-info, .badge-admin { background: var(--primary-soft); color: var(--primary); }
+.badge-neutral, .badge-manager, .badge-cashier { background: var(--surface-3); color: var(--text-muted); }
+
+/* ── Stat (KPI) — kwa dashboard mpya ── */
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+.stat-label { font-size: 13px; color: var(--text-muted); }
+.stat-value { margin-top: 4px; font-size: 22px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.stat-sub   { margin-top: 2px; font-size: 12px; color: var(--text-subtle); }
+.stat-value.is-positive { color: var(--success); }
+.stat-value.is-negative { color: var(--danger); }
+
+/* Legacy .stat-card (dashboard ya zamani inaweka gradient inline) — shimmer na radius kubwa vimeondolewa.
+   Itafutwa wakati dashboard.jsx inaandikwa upya kutumia .stat */
+.stat-card { padding: var(--space-4); border-radius: var(--radius-lg); color: #fff; position: relative; }
+@media (max-width: 640px) { .stat-card h2 { font-size: 22px !important; } }
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(16,24,40,0.5);
+  padding: var(--space-4);
+}
+.modal {
+  width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 24px;
+}
+.modal-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.modal-sub   { margin-top: 4px; font-size: 13px; color: var(--text-muted); }
+.modal-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: 20px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* ═════════════════════════════════════════════════════════════
+   EFFECTS — watermark icons, hover-lift, glass (zinatumika kwa madarasa, si inline)
+   NB: glass inafanywa kwa class (.glass, .scrim) kwa sababu safety net hapa chini
+   inazima backdrop-filter ya INLINE tu.
+   ═════════════════════════════════════════════════════════════ */
+
+/* Stat card: icon kubwa iliyofifia nyuma (rangi ya maandishi, si rangi ya ziada) */
+.stat {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.3s ease;
+}
+.stat > :not(.stat-icon) { position: relative; z-index: 1; }
+.stat-icon {
+  position: absolute; top: -10px; right: -10px; z-index: 0;
+  color: var(--text); opacity: 0.06; pointer-events: none;
+  transition: transform 0.35s ease, opacity 0.35s ease;
+}
+.stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: var(--text-subtle); }
+.stat:hover .stat-icon { opacity: 0.11; transform: translate(-6px, 6px) scale(1.07) rotate(-6deg); }
+
+/* Hover-lift kwa boxes zinazoweza kubonyezwa (hub tiles, chaguo za theme).
+   Specificity ya :not(:disabled) inashinda rule ya "button:hover" ya juu. */
+.lift { transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease; }
+.lift:hover:not(:disabled) { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: var(--text-subtle); }
+.lift:active:not(:disabled) { transform: translateY(-1px); }
+.lift .lift-icon { transition: transform 0.25s ease; }
+.lift:hover .lift-icon { transform: scale(1.08) rotate(-4deg); }
+
+/* Glass: translucent surface + blur. Tumia pale kuna kitu nyuma cha kutiwa ukungu
+   (modal, topbar ya simu, login). Si kwa tables/forms — legibility kwanza. */
+.glass { background: var(--surface); border: 1px solid var(--border); }
+@supports (backdrop-filter: blur(1px)) and (background: color-mix(in srgb, red, blue)) {
+  .glass {
+    background: color-mix(in srgb, var(--surface) 72%, transparent);
+    border-color: color-mix(in srgb, var(--border) 65%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 35%, transparent);
+  }
+  .modal {
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    border-color: color-mix(in srgb, var(--border) 65%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    backdrop-filter: blur(20px) saturate(150%);
+  }
+}
+.modal-overlay, .scrim {
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.scrim { background: rgba(16,24,40,0.5); }
+
+/* ── Shared layout helpers (zamani zilikuwa ndani ya Inventory pekee) ── */
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.form-grid .form-group { margin-bottom: 0; }
+.two-col { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1023px) { .two-col { grid-template-columns: minmax(0, 1fr); } }
+.icon-btn {
+  width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: var(--radius); background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.icon-btn:hover { background: var(--surface-3); color: var(--text); }
+.icon-btn.danger:hover { background: var(--danger-soft); color: var(--danger); }
+
+/* ═════════════════════════════════════════════════════════════
+   AMBIENT GLASS — mwanga laini nyuma ya app + glass kwenye cards/tables/sidebar
+   Glass inaonekana tu kama kuna kitu nyuma cha kutiwa ukungu; ndiyo maana kuna "glow".
+   Rangi za glow zinatoka kwenye theme (--glow-1, --glow-2) na zinabadilika na brand.
+   ═════════════════════════════════════════════════════════════ */
+:root { --glow-1: #8B9BB4; --glow-2: #C8B79E; }
+[data-theme="dark"] { --glow-1: #4B5E7C; --glow-2: #6E5C48; }
+
+body::before, body::after {
+  content: ''; position: fixed; z-index: -1; pointer-events: none; border-radius: 50%;
+  filter: blur(90px);
+}
+body::before { width: 560px; height: 560px; top: -160px; right: -140px; background: var(--glow-1); opacity: 0.34; }
+body::after  { width: 500px; height: 500px; bottom: -180px; left: 240px; background: var(--glow-2); opacity: 0.30; }
+[data-theme="dark"] body::before { opacity: 0.26; }
+[data-theme="dark"] body::after  { opacity: 0.22; }
+
+.glass-flat { background: var(--surface); }
+
+@supports (backdrop-filter: blur(1px)) and (background: color-mix(in srgb, red, blue)) {
+  .card, .stat {
+    background: color-mix(in srgb, var(--surface) 60%, transparent);
+    border-color: color-mix(in srgb, var(--border) 60%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(165%);
+    backdrop-filter: blur(16px) saturate(165%);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent), 0 1px 2px rgba(16,24,40,0.04), 0 10px 28px rgba(16,24,40,0.06);
+  }
+  .table-card {
+    background: color-mix(in srgb, var(--surface) 72%, transparent);
+    border-color: color-mix(in srgb, var(--border) 60%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(165%);
+    backdrop-filter: blur(16px) saturate(165%);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent), 0 1px 2px rgba(16,24,40,0.04), 0 10px 28px rgba(16,24,40,0.06);
+  }
+  .data-table th { background: color-mix(in srgb, var(--table-head) 65%, transparent); }
+  .glass-flat {
+    background: color-mix(in srgb, var(--surface) 68%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(165%);
+    backdrop-filter: blur(20px) saturate(165%);
+  }
+  [data-theme="dark"] .card, [data-theme="dark"] .stat, [data-theme="dark"] .table-card {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 10px 28px rgba(0,0,0,0.28);
+  }
+}
+
+/* Watermark icon: kubwa zaidi na inaonekana hata kwenye light mode */
+.stat-icon { width: 104px; height: 104px; opacity: 0.10; top: -14px; right: -14px; }
+[data-theme="dark"] .stat-icon { opacity: 0.09; }
+.stat:hover .stat-icon { opacity: 0.17; transform: translate(-6px, 6px) scale(1.07) rotate(-6deg); }
+
+/* Tabs za underline + segmented buttons (zinatumika na pages zote mpya) */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 20px; overflow-x: auto; }
+.tab { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: none; background: transparent; cursor: pointer; white-space: nowrap;
+       font-size: 14px; font-weight: 500; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 0; }
+.tab:hover:not(.active) { color: var(--text); }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+.tab:hover { transform: none; }
+.seg-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
+           background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
+.seg-btn:hover { background: var(--surface-3); }
+.seg-btn.active { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
+
+/* Drawer (paneli ya pembeni) */
+.drawer-scrim { position: fixed; inset: 0; z-index: 900; background: rgba(16,24,40,0.45); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); animation: fadeIn 0.15s ease; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 901; width: 460px; max-width: 100%; overflow-y: auto; background: var(--surface);
+          border-left: 1px solid var(--border); box-shadow: var(--shadow-lg); animation: drawerIn 0.22s ease; }
+@keyframes drawerIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@supports (backdrop-filter: blur(1px)) and (background: color-mix(in srgb, red, blue)) {
+  .drawer { background: color-mix(in srgb, var(--surface) 82%, transparent); -webkit-backdrop-filter: blur(22px) saturate(160%); backdrop-filter: blur(22px) saturate(160%); }
+}
+
+/* Mstari wa bidhaa (PO / GRN) */
+.line-grid { display: grid; gap: 8px; align-items: center; }
+.line-head { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+
+/* Mtumiaji akizima transparency kwenye OS — rudi kwenye solid */
+@media (prefers-reduced-transparency: reduce) {
+  .card, .stat, .table-card, .modal, .drawer, .glass, .glass-flat { background: var(--surface) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  body::before, body::after { display: none; }
+}
+
+/* ═════════════════════════════════════════════════════════════
+   LOADING — splash screen na spinners (SplashScreen.jsx inatumia hizi)
+   ═════════════════════════════════════════════════════════════ */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+.splash { position: fixed; inset: 0; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; animation: fadeIn 0.2s ease; }
+.splash-mark { position: relative; width: 96px; height: 96px; display: flex; align-items: center; justify-content: center; }
+.splash-logo { width: 64px; height: 64px; border-radius: 12px; background: #fff; border: 1px solid var(--border); overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-lg); }
+.splash-logo img { width: 100%; height: 100%; object-fit: contain; padding: 6px; }
+.splash-logo span { font-size: 22px; font-weight: 700; color: #2D3139; }
+.splash-ring { position: absolute; inset: 0; width: 100%; height: 100%; animation: spin 1.1s linear infinite; }
+.splash-ring circle { fill: none; stroke-width: 3; }
+.splash-ring .track { stroke: var(--border); }
+.splash-ring .arc { stroke: var(--primary); stroke-linecap: round; stroke-dasharray: 90 220; }
+.splash-name { font-size: 18px; font-weight: 600; color: var(--text); text-align: center; max-width: 80vw; }
+.splash-bar { width: 140px; height: 3px; border-radius: 3px; background: var(--border); overflow: hidden; position: relative; }
+.splash-bar::after { content: ''; position: absolute; top: 0; bottom: 0; width: 45%; border-radius: 3px; background: var(--primary); animation: slide 1.2s ease-in-out infinite; }
+.splash-foot { position: absolute; bottom: 24px; font-size: 12px; color: var(--text-subtle); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes slide { 0% { left: -45%; } 100% { left: 100%; } }
+
+/* Spinner ndogo kwa "Loading..." ndani ya kurasa */
+.spinner { display: inline-block; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--primary); animation: spin 0.8s linear infinite; vertical-align: middle; }
+.spinner-lg { width: 32px; height: 32px; border-width: 3px; }
+.loading-row { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 40px 16px; color: var(--text-muted); font-size: 14px; }
+
+/* ═════════════════════════════════════════════════════════════
+   FORM MODALS — blur kali nyuma, kichwa, na vitufe vinavyobaki chini
+   ═════════════════════════════════════════════════════════════ */
+.modal-overlay, .scrim { background: rgba(16,24,40,0.42); -webkit-backdrop-filter: blur(9px) saturate(120%); backdrop-filter: blur(9px) saturate(120%); }
+.modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.modal-actions.sticky {
+  position: sticky; bottom: -24px; margin: 20px -24px -24px; padding: 14px 24px;
+  border-top: 1px solid var(--border-light); background: var(--surface); z-index: 2;
+}
+@supports (backdrop-filter: blur(1px)) and (background: color-mix(in srgb, red, blue)) {
+  .modal-actions.sticky { background: color-mix(in srgb, var(--surface) 90%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+}
+
+/* ═════════════════════════════════════════════════════════════
+   TEMPORARY — SAFETY NET kwa pages ambazo bado hazijaandikwa upya
+   Pages za zamani zina gradients na blur ndani ya inline style.
+   Hizi rules zinazibadilisha kuwa solid/flat mara moja, bila kugusa code ya page.
+   (Hover-lift na animations nzuri zinabaki.)
+   FUTA block hii yote baada ya pages zote kusafishwa.
+   ═════════════════════════════════════════════════════════════ */
+[style*="linear-gradient"] {
+  background: var(--primary) !important;
+}
+[style*="backdrop-filter"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }

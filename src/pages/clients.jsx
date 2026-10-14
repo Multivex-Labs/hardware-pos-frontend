@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react'
+import { Users, TriangleAlert, Wallet, CreditCard, Search, Plus, Pencil, Trash2, X, Phone, Mail, MapPin, CalendarDays, HandCoins, PiggyBank } from 'lucide-react'
 import {
   getClients, createClient, updateClient, deleteClient, searchClients,
-  getClientProfile, getClientPayments, recordClientPayment, updateCreditLimit
+  getClientProfile, getClientPayments, recordClientPayment, updateCreditLimit,
+  getClientDeposits, addClientDeposit
 } from '../services/api'
 import toast from 'react-hot-toast'
 
 const emptyForm = { name: '', phone: '', email: '', address: '', credit_limit: '' }
 const emptyPayment = { amount: '', payment_method: 'cash', reference: '', notes: '' }
+const emptyDeposit = { amount: '', payment_method: 'cash', reference: '', notes: '' }
+const depositTypeLabel = { deposit_in: 'Deposit received', deposit_used: 'Used for sale', void_restore: 'Restored (sale voided)', adjustment: 'Adjustment' }
+const fmtTZS = (v) => `TSh ${Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 
 const Clients = () => {
   const [clients, setClients] = useState([])
@@ -28,6 +33,12 @@ const Clients = () => {
   const [paymentForm, setPaymentForm] = useState(emptyPayment)
   const [paymentLoading, setPaymentLoading] = useState(false)
 
+  // Deposit (Amana) state
+  const [deposits, setDeposits] = useState([])
+  const [showDepositModal, setShowDepositModal] = useState(false)
+  const [depositForm, setDepositForm] = useState(emptyDeposit)
+  const [depositLoading, setDepositLoading] = useState(false)
+
   // Credit limit edit
   const [editingCredit, setEditingCredit] = useState(false)
   const [newCreditLimit, setNewCreditLimit] = useState('')
@@ -37,7 +48,7 @@ const Clients = () => {
   const fetchClients = () => {
     getClients()
       .then(res => setClients(res.data))
-      .catch(() => toast.error('Imeshindwa kupata clients'))
+      .catch(() => toast.error('Failed to load clients'))
   }
 
   useEffect(() => { fetchClients() }, [])
@@ -45,14 +56,16 @@ const Clients = () => {
   const fetchProfile = async (id) => {
     setLoadingProfile(true)
     try {
-      const [profileRes, paymentsRes] = await Promise.all([
+      const [profileRes, paymentsRes, depositsRes] = await Promise.all([
         getClientProfile(id),
-        getClientPayments(id)
+        getClientPayments(id),
+        getClientDeposits(id)
       ])
       setProfile(profileRes.data)
       setPayments(paymentsRes.data.payments || [])
+      setDeposits(depositsRes.data.transactions || [])
     } catch {
-      toast.error('Imeshindwa kupata profile')
+      toast.error('Failed to load profile')
     } finally {
       setLoadingProfile(false)
     }
@@ -77,17 +90,17 @@ const Clients = () => {
     try {
       if (editId) {
         await updateClient(editId, form)
-        toast.success('✓ Client imebadilishwa!')
+        toast.success('✓ Client updated!')
       } else {
         await createClient(form)
-        toast.success('✓ Client ameundwa!')
+        toast.success('✓ Client created!')
       }
       setForm(emptyForm)
       setEditId(null)
       setShowForm(false)
       fetchClients()
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Imeshindwa')
+      toast.error(error.response?.data?.message || 'Failed')
     } finally {
       setLoading(false)
     }
@@ -107,14 +120,14 @@ const Clients = () => {
   }
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Una uhakika kufuta client huyu?')) return
+    if (!window.confirm('Are you sure you want to delete this client?')) return
     try {
       await deleteClient(id)
-      toast.success('✓ Client amefutwa!')
+      toast.success('✓ Client deleted!')
       fetchClients()
       if (selectedClient?.id === id) setSelectedClient(null)
     } catch {
-      toast.error('Imeshindwa kufuta')
+      toast.error('Failed to delete')
     }
   }
 
@@ -123,6 +136,7 @@ const Clients = () => {
     setActiveTab('info')
     setProfile(null)
     setPayments([])
+    setDeposits([])
     fetchProfile(client.id)
   }
 
@@ -131,427 +145,361 @@ const Clients = () => {
     setPaymentLoading(true)
     try {
       await recordClientPayment(selectedClient.id, paymentForm)
-      toast.success('✓ Malipo yamerekodiwa!')
+      toast.success('✓ Payment recorded!')
       setShowPaymentModal(false)
       setPaymentForm(emptyPayment)
       fetchProfile(selectedClient.id)
       fetchClients()
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Imeshindwa kurekodi malipo')
+      toast.error(error.response?.data?.message || 'Failed to record payment')
     } finally {
       setPaymentLoading(false)
     }
   }
 
+  const handleAddDeposit = async (e) => {
+    e.preventDefault()
+    setDepositLoading(true)
+    try {
+      await addClientDeposit({ client_id: selectedClient.id, ...depositForm })
+      toast.success('✓ Deposit recorded!')
+      setShowDepositModal(false)
+      setDepositForm(emptyDeposit)
+      fetchProfile(selectedClient.id)
+      fetchClients()
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to record deposit')
+    } finally {
+      setDepositLoading(false)
+    }
+  }
+
   const handleUpdateCreditLimit = async () => {
     if (!newCreditLimit || isNaN(newCreditLimit)) {
-      toast.error('Weka credit limit sahihi')
+      toast.error('Enter a valid credit limit')
       return
     }
     try {
       await updateCreditLimit(selectedClient.id, { credit_limit: Number(newCreditLimit) })
-      toast.success('✓ Credit limit imebadilishwa!')
+      toast.success('✓ Credit limit updated!')
       setEditingCredit(false)
       fetchProfile(selectedClient.id)
       fetchClients()
     } catch {
-      toast.error('Imeshindwa kubadilisha credit limit')
+      toast.error('Failed to update credit limit')
     }
   }
 
-  // ─── Styles ───────────────────────────────────────────────
+  // ── Muhtasari (unahesabiwa kutoka list iliyopo) ──
+  const owing = clients.filter(c => Number(c.balance) > 0)
+  const totalOwed = owing.reduce((s, c) => s + Number(c.balance), 0)
+  const totalCreditGiven = clients.reduce((s, c) => s + Number(c.credit_limit || 0), 0)
+  const totalDepositsHeld = clients.reduce((s, c) => s + Number(c.deposit || 0), 0)
+  const dash = <span style={{ color: 'var(--text-subtle)' }}>—</span>
 
-  const s = {
-    page: { display: 'flex', gap: '24px', height: 'calc(100vh - 100px)' },
-    left: { flex: selectedClient ? '1' : '1', minWidth: 0 },
-    right: {
-      width: selectedClient ? '420px' : '0',
-      minWidth: selectedClient ? '420px' : '0',
-      overflow: 'hidden',
-      transition: 'all 0.3s ease'
-    },
-    card: { background: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', overflow: 'hidden' },
-    btn: (grad) => ({
-      padding: '10px 20px', background: grad, color: 'white', border: 'none',
-      borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '13px'
-    }),
-    input: {
-      width: '100%', padding: '11px 14px', border: '2px solid #e5e7eb',
-      borderRadius: '10px', boxSizing: 'border-box', fontSize: '14px', fontWeight: '500'
-    },
-    tab: (active) => ({
-      padding: '10px 20px', border: 'none', cursor: 'pointer', fontWeight: '600',
-      fontSize: '13px', borderBottom: active ? '3px solid #667eea' : '3px solid transparent',
-      background: 'none', color: active ? '#667eea' : '#888'
-    }),
-    statBox: (color) => ({
-      background: color, borderRadius: '12px', padding: '16px', textAlign: 'center'
-    })
-  }
+  const closeForm = () => { setShowForm(false); setEditId(null); setForm(emptyForm) }
 
-  // ─── Render ───────────────────────────────────────────────
+  const InfoRow = ({ icon: Icon, label, value }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
+      <Icon size={17} strokeWidth={1.75} style={{ color: 'var(--text-subtle)', flexShrink: 0 }} />
+      <span style={{ fontSize: '13px', color: 'var(--text-muted)', flex: 1 }}>{label}</span>
+      <span style={{ fontSize: '14px', fontWeight: '500', textAlign: 'right' }}>{value}</span>
+    </div>
+  )
 
   return (
-    <div>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+    <div style={{ color: 'var(--text)' }}>
+      <div className="page-header">
         <div>
-          <h1 style={{ margin: '0 0 4px', fontSize: '28px', fontWeight: '700', background: 'linear-gradient(135deg, #43e97b, #38f9d7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            👥 Clients
-          </h1>
-          <p style={{ margin: 0, color: '#888', fontSize: '13px' }}>Simamia wateja wako wote — {clients.length} clients</p>
+          <h1>Clients</h1>
+          <p>Manage all your customers — {clients.length} clients</p>
         </div>
-        <button
-          onClick={() => { setShowForm(!showForm); setForm(emptyForm); setEditId(null) }}
-          style={s.btn(showForm ? 'linear-gradient(135deg,#f093fb,#f5576c)' : 'linear-gradient(135deg,#43e97b,#38f9d7)')}
-        >
-          {showForm ? '✕ Funga' : '+ Client Mpya'}
+        <button className="btn-primary" onClick={() => { setShowForm(true); setForm(emptyForm); setEditId(null) }}>
+          <Plus size={16} strokeWidth={2} /> New client
         </button>
       </div>
 
+      <div className="stats-row">
+        <div className="stat"><Users className="stat-icon" aria-hidden="true" /><p className="stat-label">All customers</p><p className="stat-value">{clients.length.toLocaleString()}</p></div>
+        <div className="stat"><TriangleAlert className="stat-icon" aria-hidden="true" /><p className="stat-label">With balance</p><p className="stat-value" style={{ color: owing.length > 0 ? 'var(--warning)' : undefined }}>{owing.length.toLocaleString()}</p></div>
+        <div className="stat"><Wallet className="stat-icon" aria-hidden="true" /><p className="stat-label">Total owed</p><p className="stat-value" style={{ color: totalOwed > 0 ? 'var(--danger)' : undefined }}>{fmtTZS(totalOwed)}</p></div>
+        <div className="stat"><CreditCard className="stat-icon" aria-hidden="true" /><p className="stat-label">Total credit limit</p><p className="stat-value">{fmtTZS(totalCreditGiven)}</p></div>
+        <div className="stat"><PiggyBank className="stat-icon" aria-hidden="true" /><p className="stat-label">Deposits held</p><p className="stat-value" style={{ color: totalDepositsHeld > 0 ? 'var(--success)' : undefined }}>{fmtTZS(totalDepositsHeld)}</p></div>
+      </div>
+
       {/* Search */}
-      <input
-        type="text"
-        placeholder="🔍 Tafuta kwa jina au simu..."
-        value={searchQuery}
-        onChange={handleSearch}
-        style={{ ...s.input, marginBottom: '20px' }}
-      />
+      <div style={{ position: 'relative', maxWidth: '420px', marginBottom: '16px' }}>
+        <Search size={16} strokeWidth={1.75} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-subtle)', pointerEvents: 'none' }} />
+        <input className="form-input" style={{ paddingLeft: '36px' }} type="text" placeholder="Search by name or phone..." value={searchQuery} onChange={handleSearch} />
+      </div>
 
-      {/* Add/Edit Form */}
-      {showForm && (
-        <div style={{ ...s.card, padding: '28px', marginBottom: '24px' }}>
-          <h3 style={{ margin: '0 0 20px', fontSize: '18px', fontWeight: '700' }}>
-            {editId ? '✏️ Edit Client' : '➕ Client Mpya'}
-          </h3>
-          <form onSubmit={handleSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              {[
-                { key: 'name', label: 'Jina Kamili *', required: true },
-                { key: 'phone', label: 'Namba ya Simu' },
-                { key: 'email', label: 'Email' },
-                { key: 'address', label: 'Anakotoka' },
-                { key: 'credit_limit', label: 'Credit Limit (TZS)' },
-              ].map(({ key, label, required }) => (
-                <div key={key}>
-                  <label style={{ display: 'block', marginBottom: '6px', color: '#444', fontWeight: '600', fontSize: '13px' }}>{label}</label>
-                  <input
-                    type={key === 'credit_limit' ? 'number' : 'text'}
-                    value={form[key]}
-                    onChange={e => setForm({ ...form, [key]: e.target.value })}
-                    style={s.input}
-                    required={required}
-                    min={key === 'credit_limit' ? '0' : undefined}
-                  />
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-              <button type="submit" disabled={loading}
-                style={s.btn('linear-gradient(135deg,#667eea,#764ba2)')}>
-                {loading ? '⏳ Inahifadhi...' : editId ? '✓ Hifadhi Mabadiliko' : '✓ Unda Client'}
-              </button>
-              <button type="button" onClick={() => { setShowForm(false); setEditId(null); setForm(emptyForm) }}
-                style={s.btn('#aaa')}>
-                Ghairi
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Main content area */}
-      <div style={s.page}>
-
-        {/* LEFT — Client List */}
-        <div style={s.left}>
-          <div style={s.card}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: 'linear-gradient(135deg,#f8f9fa,#e9ecef)' }}>
-                  {['Jina', 'Simu', 'Deni (Balance)', 'Credit Limit', 'Hali', 'Actions'].map(h => (
-                    <th key={h} style={{ textAlign: 'left', padding: '16px 18px', color: '#666', fontWeight: '700', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
-                  ))}
+      {/* Client list */}
+      <div className="table-card">
+        <div className="table-wrapper">
+          <table className="data-table" style={{ minWidth: '720px' }}>
+            <thead>
+              <tr><th>Name</th><th>Phone</th><th className="num">Balance owed</th><th className="num">Deposit</th><th className="num">Credit limit</th><th>Status</th><th style={{ textAlign: 'right' }}>Actions</th></tr>
+            </thead>
+            <tbody>
+              {clients.length === 0 && <tr><td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-subtle)' }}>No clients yet.</td></tr>}
+              {clients.map(client => (
+                <tr key={client.id} onClick={() => handleViewProfile(client)} style={{ cursor: 'pointer', background: selectedClient?.id === client.id ? 'var(--primary-soft)' : undefined }}>
+                  <td>
+                    <div style={{ fontWeight: '600' }}>{client.name}</div>
+                    {client.email && <div style={{ fontSize: '12px', color: 'var(--text-subtle)' }}>{client.email}</div>}
+                  </td>
+                  <td style={{ color: 'var(--text-muted)' }}>{client.phone || '—'}</td>
+                  <td className="num mono">{Number(client.balance) > 0 ? <span style={{ color: 'var(--danger)', fontWeight: '600' }}>{fmtTZS(client.balance)}</span> : dash}</td>
+                  <td className="num mono">{Number(client.deposit) > 0 ? <span style={{ color: 'var(--success)', fontWeight: '600' }}>{fmtTZS(client.deposit)}</span> : dash}</td>
+                  <td className="num mono" style={{ color: 'var(--text-muted)' }}>{Number(client.credit_limit) > 0 ? fmtTZS(client.credit_limit) : dash}</td>
+                  <td><span className={`badge ${client.status === 'active' ? 'badge-success' : 'badge-danger'}`}>{client.status === 'active' ? 'Active' : 'Inactive'}</span></td>
+                  <td onClick={e => e.stopPropagation()}>
+                    <div className="actions">
+                      <button className="icon-btn" onClick={() => handleEdit(client)} title="Edit" aria-label={`Edit ${client.name}`}><Pencil size={16} strokeWidth={1.75} /></button>
+                      <button className="icon-btn danger" onClick={() => handleDelete(client.id)} title="Delete" aria-label={`Delete ${client.name}`}><Trash2 size={16} strokeWidth={1.75} /></button>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {clients.map(client => (
-                  <tr
-                    key={client.id}
-                    style={{
-                      borderBottom: '1px solid #f0f0f0',
-                      background: selectedClient?.id === client.id ? '#f0f4ff' : 'white',
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => handleViewProfile(client)}
-                  >
-                    <td style={{ padding: '16px 18px', fontWeight: '600' }}>
-                      <div>{client.name}</div>
-                      {client.email && <div style={{ fontSize: '12px', color: '#aaa' }}>{client.email}</div>}
-                    </td>
-                    <td style={{ padding: '16px 18px', color: '#666' }}>{client.phone || '—'}</td>
-                    <td style={{ padding: '16px 18px' }}>
-                      <span style={{
-                        fontWeight: '700',
-                        color: Number(client.balance) > 0 ? '#e53e3e' : '#38a169'
-                      }}>
-                        {Number(client.balance) > 0 ? `TZS ${Number(client.balance).toLocaleString()}` : '—'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '16px 18px', color: '#666' }}>
-                      {Number(client.credit_limit) > 0 ? `TZS ${Number(client.credit_limit).toLocaleString()}` : '—'}
-                    </td>
-                    <td style={{ padding: '16px 18px' }}>
-                      <span style={{
-                        padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
-                        background: client.status === 'active' ? '#d4edda' : '#f8d7da',
-                        color: client.status === 'active' ? '#155724' : '#721c24'
-                      }}>
-                        {client.status === 'active' ? '● Active' : '● Inactive'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '16px 18px' }} onClick={e => e.stopPropagation()}>
-                      <button onClick={() => handleEdit(client)}
-                        style={{ ...s.btn('linear-gradient(135deg,#4facfe,#00f2fe)'), marginRight: '8px', padding: '7px 14px' }}>
-                        ✏️
-                      </button>
-                      <button onClick={() => handleDelete(client.id)}
-                        style={{ ...s.btn('linear-gradient(135deg,#f093fb,#f5576c)'), padding: '7px 14px' }}>
-                        🗑️
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {clients.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '60px', color: '#aaa' }}>
-                <div style={{ fontSize: '48px', marginBottom: '12px' }}>👥</div>
-                <p style={{ margin: 0, fontWeight: '500' }}>Hakuna clients bado</p>
-              </div>
-            )}
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
+      </div>
 
-        {/* RIGHT — Client Profile Panel */}
-        {selectedClient && (
-          <div style={s.right}>
-            <div style={{ ...s.card, height: '100%', overflowY: 'auto' }}>
-
-              {/* Profile Header */}
-              <div style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', padding: '24px', color: 'white', position: 'relative' }}>
-                <button
-                  onClick={() => setSelectedClient(null)}
-                  style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '16px' }}
-                >✕</button>
-                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', marginBottom: '12px' }}>
-                  {selectedClient.name?.charAt(0).toUpperCase()}
-                </div>
-                <h2 style={{ margin: '0 0 4px', fontSize: '20px' }}>{selectedClient.name}</h2>
-                <p style={{ margin: 0, opacity: 0.8, fontSize: '13px' }}>{selectedClient.phone}</p>
+      {/* ═════════ Profile drawer ═════════ */}
+      {selectedClient && (
+        <>
+          <div className="drawer-scrim" onClick={() => setSelectedClient(null)} />
+          <aside className="drawer" aria-label={`Profile of ${selectedClient.name}`}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '20px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--primary)', color: 'var(--on-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '600', flexShrink: 0 }}>
+                {selectedClient.name?.charAt(0).toUpperCase()}
               </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h2 style={{ fontSize: '17px', fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedClient.name}</h2>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{selectedClient.phone || 'No phone'}</p>
+              </div>
+              <button className="icon-btn" onClick={() => setSelectedClient(null)} aria-label="Close"><X size={18} strokeWidth={1.75} /></button>
+            </div>
 
-              {/* Stats boxes */}
-              {loadingProfile ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: '#aaa' }}>⏳ Inapakia...</div>
-              ) : profile ? (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '20px' }}>
-                    <div style={s.statBox('#fff5f5')}>
-                      <div style={{ fontSize: '11px', color: '#e53e3e', fontWeight: '700', marginBottom: '4px' }}>DENI</div>
-                      <div style={{ fontSize: '16px', fontWeight: '800', color: '#e53e3e' }}>
-                        TZS {Number(profile.balance).toLocaleString()}
-                      </div>
-                    </div>
-                    <div style={s.statBox('#f0fff4')}>
-                      <div style={{ fontSize: '11px', color: '#38a169', fontWeight: '700', marginBottom: '4px' }}>AVAILABLE CREDIT</div>
-                      <div style={{ fontSize: '16px', fontWeight: '800', color: '#38a169' }}>
-                        TZS {Number(profile.available_credit || 0).toLocaleString()}
-                      </div>
-                    </div>
-                    <div style={s.statBox('#ebf8ff')}>
-                      <div style={{ fontSize: '11px', color: '#3182ce', fontWeight: '700', marginBottom: '4px' }}>TOTAL SALES</div>
-                      <div style={{ fontSize: '16px', fontWeight: '800', color: '#3182ce' }}>{profile.total_sales}</div>
-                    </div>
-                    <div style={s.statBox('#faf5ff')}>
-                      <div style={{ fontSize: '11px', color: '#805ad5', fontWeight: '700', marginBottom: '4px' }}>JUMLA UNUNUZI</div>
-                      <div style={{ fontSize: '14px', fontWeight: '800', color: '#805ad5' }}>
-                        TZS {Number(profile.total_purchased).toLocaleString()}
-                      </div>
-                    </div>
+            {loadingProfile ? (
+              <p style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</p>
+            ) : profile ? (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', padding: '20px' }}>
+                  <div className="stat" style={{ padding: '12px 14px', gridColumn: '1 / -1' }}>
+                    <p className="stat-label">Deposit balance (Amana)</p>
+                    <p className="stat-value" style={{ fontSize: '17px', color: Number(profile.deposit) > 0 ? 'var(--success)' : undefined }}>{fmtTZS(profile.deposit)}</p>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Money held for this client. It counts as revenue only when used to pay for a sale.</p>
                   </div>
+                  <div className="stat" style={{ padding: '12px 14px' }}>
+                    <p className="stat-label">Balance owed</p>
+                    <p className="stat-value" style={{ fontSize: '17px', color: Number(profile.balance) > 0 ? 'var(--danger)' : undefined }}>{fmtTZS(profile.balance)}</p>
+                  </div>
+                  <div className="stat" style={{ padding: '12px 14px' }}>
+                    <p className="stat-label">Available credit</p>
+                    <p className="stat-value" style={{ fontSize: '17px', color: 'var(--success)' }}>{fmtTZS(profile.available_credit)}</p>
+                  </div>
+                  <div className="stat" style={{ padding: '12px 14px' }}>
+                    <p className="stat-label">Total sales</p>
+                    <p className="stat-value" style={{ fontSize: '17px' }}>{profile.total_sales}</p>
+                  </div>
+                  <div className="stat" style={{ padding: '12px 14px' }}>
+                    <p className="stat-label">Total purchased</p>
+                    <p className="stat-value" style={{ fontSize: '17px' }}>{fmtTZS(profile.total_purchased)}</p>
+                  </div>
+                </div>
 
-                  {/* Record Payment Button */}
+                <div style={{ padding: '0 20px 16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button className="btn-primary btn-lg" style={{ flex: 1 }} onClick={() => { setShowDepositModal(true); setDepositForm(emptyDeposit) }}>
+                    <PiggyBank size={18} strokeWidth={1.75} /> Add deposit
+                  </button>
                   {Number(profile.balance) > 0 && (
-                    <div style={{ paddingInline: '20px', marginBottom: '16px' }}>
-                      <button
-                        onClick={() => { setShowPaymentModal(true); setPaymentForm(emptyPayment) }}
-                        style={{ ...s.btn('linear-gradient(135deg,#43e97b,#38f9d7)'), width: '100%', padding: '13px' }}
-                      >
-                        💰 Rekodi Malipo
+                    <button className="btn-primary btn-lg" style={{ flex: 1 }} onClick={() => { setShowPaymentModal(true); setPaymentForm(emptyPayment) }}>
+                      <HandCoins size={18} strokeWidth={1.75} /> Record payment
+                    </button>
+                  )}
+                </div>
+
+                {/* Credit limit */}
+                <div style={{ padding: '0 20px 16px' }}>
+                  <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Credit limit</p>
+                        <p className="mono" style={{ fontSize: '17px', fontWeight: '600' }}>{fmtTZS(profile.credit_limit)}</p>
+                      </div>
+                      <button className="btn btn-sm" onClick={() => { setEditingCredit(!editingCredit); setNewCreditLimit(profile.credit_limit) }}>
+                        {editingCredit ? 'Cancel' : <><Pencil size={14} strokeWidth={1.75} /> Edit</>}
                       </button>
+                    </div>
+                    {editingCredit && (
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                        <input className="form-input mono" type="number" value={newCreditLimit} onChange={e => setNewCreditLimit(e.target.value)} placeholder="Enter new limit" min="0" />
+                        <button className="btn-primary" onClick={handleUpdateCreditLimit}>Save</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="tabs" style={{ padding: '0 20px', marginBottom: 0 }}>
+                  {[['info', 'Info'], ['deposits', 'Deposits'], ['payments', 'Payments'], ['history', 'Purchases']].map(([tab, label]) => (
+                    <button key={tab} className={`tab${activeTab === tab ? ' active' : ''}`} onClick={() => setActiveTab(tab)}>{label}</button>
+                  ))}
+                </div>
+
+                <div style={{ padding: '8px 20px 24px' }}>
+                  {activeTab === 'info' && (
+                    <div>
+                      <InfoRow icon={Phone} label="Phone" value={profile.phone || '—'} />
+                      <InfoRow icon={Mail} label="Email" value={profile.email || '—'} />
+                      <InfoRow icon={MapPin} label="Address" value={profile.address || '—'} />
+                      <InfoRow icon={CalendarDays} label="Added on" value={new Date(profile.created_at).toLocaleDateString('en-GB')} />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0' }}>
+                        <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Status</span>
+                        <span className={`badge ${profile.status === 'active' ? 'badge-success' : 'badge-danger'}`}>{profile.status === 'active' ? 'Active' : 'Inactive'}</span>
+                      </div>
                     </div>
                   )}
 
-                  {/* Credit Limit Section */}
-                  <div style={{ paddingInline: '20px', marginBottom: '16px' }}>
-                    <div style={{ background: '#f8f9fa', borderRadius: '12px', padding: '16px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: editingCredit ? '12px' : '0' }}>
-                        <div>
-                          <div style={{ fontSize: '11px', color: '#888', fontWeight: '700' }}>CREDIT LIMIT</div>
-                          <div style={{ fontSize: '16px', fontWeight: '700' }}>TZS {Number(profile.credit_limit).toLocaleString()}</div>
-                        </div>
-                        <button
-                          onClick={() => { setEditingCredit(!editingCredit); setNewCreditLimit(profile.credit_limit) }}
-                          style={s.btn(editingCredit ? '#aaa' : 'linear-gradient(135deg,#4facfe,#00f2fe)')}
-                        >
-                          {editingCredit ? 'Ghairi' : '✏️ Edit'}
-                        </button>
-                      </div>
-                      {editingCredit && (
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <input
-                            type="number"
-                            value={newCreditLimit}
-                            onChange={e => setNewCreditLimit(e.target.value)}
-                            style={{ ...s.input, flex: 1 }}
-                            placeholder="Weka limit mpya"
-                            min="0"
-                          />
-                          <button onClick={handleUpdateCreditLimit}
-                            style={s.btn('linear-gradient(135deg,#667eea,#764ba2)')}>
-                            ✓ Hifadhi
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Tabs */}
-                  <div style={{ borderBottom: '1px solid #f0f0f0', display: 'flex', paddingInline: '20px' }}>
-                    {[['info', '👤 Info'], ['payments', '💰 Malipo'], ['history', '🛒 Manunuzi']].map(([tab, label]) => (
-                      <button key={tab} style={s.tab(activeTab === tab)} onClick={() => setActiveTab(tab)}>{label}</button>
-                    ))}
-                  </div>
-
-                  {/* Tab Content */}
-                  <div style={{ padding: '20px' }}>
-
-                    {/* INFO TAB */}
-                    {activeTab === 'info' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {[
-                          ['📱 Simu', profile.phone || '—'],
-                          ['📧 Email', profile.email || '—'],
-                          ['📍 Anakotoka', profile.address || '—'],
-                          ['📅 Aliongezwa', new Date(profile.created_at).toLocaleDateString('sw-TZ')],
-                          ['🔵 Hali', profile.status],
-                        ].map(([label, value]) => (
-                          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: '#f8f9fa', borderRadius: '10px' }}>
-                            <span style={{ color: '#888', fontSize: '13px' }}>{label}</span>
-                            <span style={{ fontWeight: '600', fontSize: '13px' }}>{value}</span>
+                  {activeTab === 'deposits' && (
+                    deposits.length === 0 ? (
+                      <p style={{ textAlign: 'center', padding: '32px 0', fontSize: '13px', color: 'var(--text-subtle)' }}>No deposit activity yet.</p>
+                    ) : (
+                      <div>
+                        {deposits.map(tx => (
+                          <div key={tx.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                              <span className="mono" style={{ fontWeight: '600', color: Number(tx.amount) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                {Number(tx.amount) >= 0 ? '+' : '−'}{fmtTZS(Math.abs(Number(tx.amount)))}
+                              </span>
+                              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(tx.created_at).toLocaleDateString('en-GB')}</span>
+                            </div>
+                            <div style={{ fontSize: '13px' }}>
+                              {depositTypeLabel[tx.type] || tx.type}{tx.sale_id ? ` #${tx.sale_id}` : ''}
+                              <span className="mono" style={{ color: 'var(--text-muted)' }}> · balance {fmtTZS(tx.balance_after)}</span>
+                            </div>
+                            {(tx.payment_method || tx.reference) && <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{[tx.payment_method, tx.reference && `Ref: ${tx.reference}`].filter(Boolean).join(' · ')}</div>}
+                            {tx.recorded_by_name && <div style={{ fontSize: '12px', color: 'var(--text-subtle)' }}>Recorded by: {tx.recorded_by_name}</div>}
                           </div>
                         ))}
                       </div>
-                    )}
+                    )
+                  )}
 
-                    {/* PAYMENTS TAB */}
-                    {activeTab === 'payments' && (
+                  {activeTab === 'payments' && (
+                    payments.length === 0 ? (
+                      <p style={{ textAlign: 'center', padding: '32px 0', fontSize: '13px', color: 'var(--text-subtle)' }}>No payments yet.</p>
+                    ) : (
                       <div>
-                        {payments.length === 0 ? (
-                          <div style={{ textAlign: 'center', padding: '30px', color: '#aaa' }}>
-                            <div style={{ fontSize: '32px', marginBottom: '8px' }}>💳</div>
-                            <p style={{ margin: 0 }}>Hakuna malipo bado</p>
+                        {payments.map(p => (
+                          <div key={p.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border-light)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                              <span className="mono" style={{ fontWeight: '600', color: 'var(--success)' }}>{fmtTZS(p.amount)}</span>
+                              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(p.created_at).toLocaleDateString('en-GB')}</span>
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{p.payment_method}{p.reference && ` · Ref: ${p.reference}`}</div>
+                            {p.recorded_by_name && <div style={{ fontSize: '12px', color: 'var(--text-subtle)' }}>Recorded by: {p.recorded_by_name}</div>}
                           </div>
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {payments.map(p => (
-                              <div key={p.id} style={{ background: '#f8f9fa', borderRadius: '10px', padding: '14px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                  <span style={{ fontWeight: '700', color: '#38a169' }}>TZS {Number(p.amount).toLocaleString()}</span>
-                                  <span style={{ fontSize: '12px', color: '#aaa' }}>{new Date(p.created_at).toLocaleDateString('sw-TZ')}</span>
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#888' }}>
-                                  {p.payment_method} {p.reference && `· Ref: ${p.reference}`}
-                                </div>
-                                {p.recorded_by_name && <div style={{ fontSize: '12px', color: '#aaa' }}>Rekodiwa na: {p.recorded_by_name}</div>}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        ))}
                       </div>
-                    )}
+                    )
+                  )}
 
-                    {/* HISTORY TAB */}
-                    {activeTab === 'history' && (
-                      <div style={{ textAlign: 'center', padding: '30px', color: '#aaa' }}>
-                        <div style={{ fontSize: '32px', marginBottom: '8px' }}>🛒</div>
-                        <p style={{ margin: 0 }}>Tembelea Sales page kwa historia kamili</p>
-                      </div>
-                    )}
+                  {activeTab === 'history' && (
+                    <p style={{ textAlign: 'center', padding: '32px 0', fontSize: '13px', color: 'var(--text-subtle)' }}>Visit the Sales page for the full history.</p>
+                  )}
+                </div>
+              </>
+            ) : null}
+          </aside>
+        </>
+      )}
 
-                  </div>
-                </>
-              ) : null}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Payment Modal */}
-      {showPaymentModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: 'white', borderRadius: '20px', padding: '32px', width: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: '20px', fontWeight: '700' }}>💰 Rekodi Malipo</h3>
-            <p style={{ margin: '0 0 24px', color: '#888', fontSize: '13px' }}>
-              Client: <strong>{selectedClient?.name}</strong> · Deni: <strong style={{ color: '#e53e3e' }}>TZS {Number(profile?.balance).toLocaleString()}</strong>
+      {/* ═════════ Add deposit modal ═════════ */}
+      {showDepositModal && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }} onClick={() => setShowDepositModal(false)}>
+          <div className="modal" style={{ maxWidth: '440px' }} onClick={e => e.stopPropagation()}>
+            <h3 className="modal-title">Add deposit (Amana)</h3>
+            <p className="modal-sub" style={{ marginBottom: '20px' }}>
+              {selectedClient?.name} — current deposit {fmtTZS(profile?.deposit)}. This money is held for the client and counts as revenue only when it is used to pay for a sale.
             </p>
-            <form onSubmit={handleRecordPayment}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '13px' }}>Kiasi (TZS) *</label>
-                  <input type="number" value={paymentForm.amount}
-                    onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                    style={s.input} placeholder="eg. 50000" required min="1" max={profile?.balance} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '13px' }}>Njia ya Malipo</label>
-                  <select value={paymentForm.payment_method}
-                    onChange={e => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
-                    style={s.input}>
-                    <option value="cash">💵 Cash</option>
-                    <option value="bank_transfer">🏦 Bank Transfer</option>
-                    <option value="mobile_money">📱 Mobile Money (M-Pesa/Tigo)</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '13px' }}>Reference / Namba ya Risiti</label>
-                  <input type="text" value={paymentForm.reference}
-                    onChange={e => setPaymentForm({ ...paymentForm, reference: e.target.value })}
-                    style={s.input} placeholder="eg. MPE123456" />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '13px' }}>Maelezo (optional)</label>
-                  <input type="text" value={paymentForm.notes}
-                    onChange={e => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                    style={s.input} placeholder="eg. Malipo ya mkopo wa wiki iliyopita" />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                <button type="submit" disabled={paymentLoading}
-                  style={{ ...s.btn('linear-gradient(135deg,#43e97b,#38f9d7)'), flex: 1, padding: '13px' }}>
-                  {paymentLoading ? '⏳ Inahifadhi...' : '✓ Rekodi Malipo'}
-                </button>
-                <button type="button" onClick={() => setShowPaymentModal(false)}
-                  style={s.btn('#aaa')}>
-                  Ghairi
-                </button>
+            <form onSubmit={handleAddDeposit}>
+              <div className="form-group"><label className="form-label">Amount (TSh)</label>
+                <input className="form-input mono" type="number" value={depositForm.amount} onChange={e => setDepositForm({ ...depositForm, amount: e.target.value })} placeholder="eg. 100000" required min="1" /></div>
+              <div className="form-group"><label className="form-label">Payment method</label>
+                <select className="form-input" value={depositForm.payment_method} onChange={e => setDepositForm({ ...depositForm, payment_method: e.target.value })}>
+                  <option value="cash">Cash</option><option value="mobile_money">Mobile Money</option><option value="bank_transfer">Bank Transfer</option>
+                </select></div>
+              <div className="form-group"><label className="form-label">Reference (optional)</label>
+                <input className="form-input" type="text" value={depositForm.reference} onChange={e => setDepositForm({ ...depositForm, reference: e.target.value })} placeholder="eg. MPE123456" /></div>
+              <div className="form-group"><label className="form-label">Notes (optional)</label>
+                <input className="form-input" type="text" value={depositForm.notes} onChange={e => setDepositForm({ ...depositForm, notes: e.target.value })} placeholder="e.g. Advance for roofing materials" /></div>
+              <div className="modal-actions">
+                <button type="button" className="btn" onClick={() => setShowDepositModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={depositLoading}>{depositLoading ? 'Saving...' : 'Add deposit'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
+      {/* ═════════ Add / Edit client modal ═════════ */}
+      {showForm && (
+        <div className="modal-overlay" onClick={closeForm}>
+          <div className="modal" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
+            <h3 className="modal-title" style={{ marginBottom: '20px' }}>{editId ? 'Edit client' : 'New client'}</h3>
+            <form onSubmit={handleSubmit}>
+              {[
+                { key: 'name', label: 'Full name *', required: true },
+                { key: 'phone', label: 'Phone number' },
+                { key: 'email', label: 'Email' },
+                { key: 'address', label: 'Address' },
+                { key: 'credit_limit', label: 'Credit limit (TSh)' },
+              ].map(({ key, label, required }) => (
+                <div className="form-group" key={key}>
+                  <label className="form-label">{label}</label>
+                  <input className={`form-input${key === 'credit_limit' ? ' mono' : ''}`} type={key === 'credit_limit' ? 'number' : 'text'} value={form[key]}
+                    onChange={e => setForm({ ...form, [key]: e.target.value })} required={required} min={key === 'credit_limit' ? '0' : undefined} />
+                </div>
+              ))}
+              <div className="modal-actions">
+                <button type="button" className="btn" onClick={closeForm}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={loading}>{loading ? 'Saving...' : editId ? 'Save changes' : 'Create client'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═════════ Record payment modal ═════════ */}
+      {showPaymentModal && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }} onClick={() => setShowPaymentModal(false)}>
+          <div className="modal" style={{ maxWidth: '460px' }} onClick={e => e.stopPropagation()}>
+            <h3 className="modal-title">Record payment</h3>
+            <p className="modal-sub" style={{ marginBottom: '20px' }}>
+              Client: <strong>{selectedClient?.name}</strong> · Balance owed: <strong style={{ color: 'var(--danger)' }}>{fmtTZS(profile?.balance)}</strong>
+            </p>
+            <form onSubmit={handleRecordPayment}>
+              <div className="form-group"><label className="form-label">Amount (TSh) *</label>
+                <input className="form-input mono" type="number" value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} placeholder="eg. 50000" required min="1" max={profile?.balance} /></div>
+              <div className="form-group"><label className="form-label">Payment method</label>
+                <select className="form-input" value={paymentForm.payment_method} onChange={e => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}>
+                  <option value="cash">Cash</option><option value="bank_transfer">Bank Transfer</option><option value="mobile_money">Mobile Money (M-Pesa/Tigo)</option>
+                </select></div>
+              <div className="form-group"><label className="form-label">Reference / receipt number</label>
+                <input className="form-input" type="text" value={paymentForm.reference} onChange={e => setPaymentForm({ ...paymentForm, reference: e.target.value })} placeholder="eg. MPE123456" /></div>
+              <div className="form-group" style={{ marginBottom: 0 }}><label className="form-label">Notes (optional)</label>
+                <input className="form-input" type="text" value={paymentForm.notes} onChange={e => setPaymentForm({ ...paymentForm, notes: e.target.value })} placeholder="e.g. Payment for last week's credit" /></div>
+              <div className="modal-actions">
+                <button type="button" className="btn" onClick={() => setShowPaymentModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={paymentLoading}>{paymentLoading ? 'Saving...' : 'Record payment'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
