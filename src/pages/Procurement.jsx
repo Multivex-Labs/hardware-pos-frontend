@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { Factory, ClipboardList, PackageCheck, Wallet, Plus, Trash2, HandCoins, Info } from 'lucide-react'
 import { getProducts } from '../services/api'
+import { useAuth } from '../context/AuthContext'
+import { hasPermission } from '../services/permissions'
 import toast from 'react-hot-toast'
 import Modal from '../components/Modal'
 
@@ -21,6 +23,9 @@ const STATUS = {
 const emptyGrnForm = () => ({ received_date: new Date().toISOString().slice(0, 10), notes: '', vendor_id: '', payment_type: 'cash', amount_paid: '' })
 
 const Procurement = () => {
+  const { user } = useAuth()
+  const canCreate = hasPermission(user, 'procurement', 'create')
+  const canDelete = hasPermission(user, 'procurement', 'delete')
   const [activeTab, setActiveTab] = useState('pos')
   const [vendors, setVendors] = useState([])
   const [pos, setPos] = useState([])
@@ -149,15 +154,15 @@ const Procurement = () => {
           <p>Vendors, purchase orders and GRNs</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          {activeTab === 'pos' && (
+          {activeTab === 'pos' && canCreate && (
             <button className="btn-primary" onClick={() => setShowPOForm(true)}><Plus size={16} strokeWidth={2} /> Purchase Order</button>
           )}
-          {activeTab === 'grn' && (
+          {activeTab === 'grn' && canCreate && (
             <button className="btn-primary" onClick={() => { setSelectedPO(null); setGrnItems([{ product_id: '', product_name: '', quantity_received: '', unit_cost: '' }]); setGrnForm(emptyGrnForm()); setShowGRNForm(true) }}>
               <Plus size={16} strokeWidth={2} /> Receive without PO
             </button>
           )}
-          {activeTab === 'vendors' && (
+          {activeTab === 'vendors' && canCreate && (
             <button className="btn-primary" onClick={() => setShowVendorForm(true)}><Plus size={16} strokeWidth={2} /> Vendor</button>
           )}
         </div>
@@ -246,7 +251,7 @@ const Procurement = () => {
                         <td><span className={`badge ${s.cls}`}>{s.label}</span></td>
                         <td>
                           <div className="actions">
-                            {open && <button className="btn btn-sm" onClick={() => openGRN(po)}><PackageCheck size={14} strokeWidth={1.75} /> Receive</button>}
+                            {open && canCreate && <button className="btn btn-sm" onClick={() => openGRN(po)}><PackageCheck size={14} strokeWidth={1.75} /> Receive</button>}
                             {open && <button className="btn btn-sm" style={{ color: 'var(--danger)' }} onClick={() => cancelPO(po)}>Cancel</button>}
                           </div>
                         </td>
@@ -391,8 +396,8 @@ const Procurement = () => {
                       <td className="num mono">{Number(v.balance) > 0 ? <span style={{ color: 'var(--danger)', fontWeight: '600' }}>{fmt(v.balance)}</span> : dash}</td>
                       <td>
                         <div className="actions">
-                          {Number(v.balance) > 0 && <button className="btn btn-sm" onClick={() => setPayVendor(v)}><HandCoins size={14} strokeWidth={1.75} /> Pay</button>}
-                          <button className="icon-btn danger" onClick={() => deleteVendor(v)} title="Delete" aria-label={`Delete ${v.name}`}><Trash2 size={16} strokeWidth={1.75} /></button>
+                          {canCreate && Number(v.balance) > 0 && <button className="btn btn-sm" onClick={() => setPayVendor(v)}><HandCoins size={14} strokeWidth={1.75} /> Pay</button>}
+                          {canDelete && <button className="icon-btn danger" onClick={() => deleteVendor(v)} title="Delete" aria-label={`Delete ${v.name}`}><Trash2 size={16} strokeWidth={1.75} /></button>}
                         </div>
                       </td>
                     </tr>

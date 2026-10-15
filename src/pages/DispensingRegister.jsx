@@ -3,10 +3,14 @@ import { Pill, ClipboardList, TriangleAlert, Plus } from 'lucide-react'
 import { getProducts, getDispensingLog, createDispensingRecord } from '../services/api'
 import toast from 'react-hot-toast'
 import Modal from '../components/Modal'
+import { useAuth } from '../context/AuthContext'
+import { hasPermission } from '../services/permissions'
 
 const fmtDate = (d) => new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 const DispensingRegister = () => {
+  const { user } = useAuth()
+  const canCreate = hasPermission(user, 'dispensing', 'create')
   const [products, setProducts] = useState([])
   const [logs, setLogs] = useState([])
   const [logsLoading, setLogsLoading] = useState(true)
@@ -61,7 +65,7 @@ const DispensingRegister = () => {
           <h1>Dispensing Register</h1>
           <p>Basic PPB-compliant log of dispensed medicines</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(true)}><Plus size={16} strokeWidth={2} /> Record dispensing</button>
+        {canCreate && <button className="btn-primary" onClick={() => setShowForm(true)}><Plus size={16} strokeWidth={2} /> Record dispensing</button>}
       </div>
 
       <div className="stats-row">

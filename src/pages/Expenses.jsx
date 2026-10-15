@@ -3,12 +3,17 @@ import { Receipt, CalendarDays, Trash2, Plus } from 'lucide-react'
 import { getExpenses, createExpense, deleteExpense } from '../services/api'
 import toast from 'react-hot-toast'
 import Modal from '../components/Modal'
+import { useAuth } from '../context/AuthContext'
+import { hasPermission } from '../services/permissions'
 
 const CATEGORIES = ['Rent', 'Electricity', 'Water', 'Transport / Fuel', 'Salaries', 'Office supplies', 'Repairs', 'Other']
 
 const fmtTZS = (v) => `TSh ${parseFloat(v || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 
 const Expenses = () => {
+  const { user } = useAuth()
+  const canCreate = hasPermission(user, 'expenses', 'create')
+  const canDelete = hasPermission(user, 'expenses', 'delete')
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -55,7 +60,7 @@ const Expenses = () => {
           <h1>Expenses</h1>
           <p>Record your business running costs</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(true)}><Plus size={16} strokeWidth={2} /> New expense</button>
+        {canCreate && <button className="btn-primary" onClick={() => setShowForm(true)}><Plus size={16} strokeWidth={2} /> New expense</button>}
       </div>
 
       <div className="stats-row">
@@ -122,7 +127,7 @@ const Expenses = () => {
                     <td className="num mono" style={{ fontWeight: '600' }}>{fmtTZS(exp.amount)}</td>
                     <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{exp.recorded_by_name || '—'}</td>
                     <td>
-                      <button className="icon-btn danger" onClick={() => handleDelete(exp.id)} title="Delete" aria-label="Delete expense"><Trash2 size={16} strokeWidth={1.75} /></button>
+                      {canDelete && <button className="icon-btn danger" onClick={() => handleDelete(exp.id)} title="Delete" aria-label="Delete expense"><Trash2 size={16} strokeWidth={1.75} /></button>}
                     </td>
                   </tr>
                 ))}

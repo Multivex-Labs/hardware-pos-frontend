@@ -7,6 +7,7 @@ import {
   getBusinessSettings
 } from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { hasPermission } from '../services/permissions'
 import toast from 'react-hot-toast'
 import Modal from '../components/Modal'
 import { Package, History, ArrowLeftRight, Plus, X, Search, Pencil, Layers, Scale, Trash2, Pill, ArrowUp, ArrowDown, Info, Banknote, TriangleAlert, PackageX } from 'lucide-react'
@@ -78,9 +79,12 @@ const TABS = [
 
 const Inventory = () => {
   const { user } = useAuth()
-  const canAdjustStock = user?.role === 'admin' || user?.role === 'manager'
-  const canManageUnits = user?.role === 'admin'
-  const canConvert = user?.role === 'admin' || user?.role === 'manager'
+  const canCreate = hasPermission(user, 'inventory', 'create')
+  const canEdit = hasPermission(user, 'inventory', 'edit')
+  const canDelete = hasPermission(user, 'inventory', 'delete')
+  const canManageUnits = canCreate || canDelete
+  const canAdjustStock = canEdit
+  const canConvert = canEdit
 
   const [businessType, setBusinessType] = useState('general')
   const isPharmacy = businessType === 'pharmacy'
@@ -398,7 +402,7 @@ const Inventory = () => {
           {activeTab === 'conversions' && canConvert && (
             <button className="btn" onClick={openConversionModal}><Plus size={16} strokeWidth={1.75} /> Conversion</button>
           )}
-          {activeTab === 'products' && (
+          {activeTab === 'products' && canCreate && (
             <button className="btn-primary" onClick={() => { setForm(EMPTY_FORM); setEditingId(null); setShowForm(true) }}>
               <Plus size={16} strokeWidth={2} /> New product
             </button>
@@ -499,7 +503,7 @@ const Inventory = () => {
                 )}
 
                 <div className="modal-actions sticky">
-                  <button type="submit" className="btn-primary" disabled={loading}>{loading ? 'Saving...' : editingId ? 'Save changes' : 'Add product'}</button>
+                  <button type="submit" className="btn-primary" disabled={loading || (editingId ? !canEdit : !canCreate)}>{loading ? 'Saving...' : editingId ? 'Save changes' : 'Add product'}</button>
                   <button type="button" className="btn" onClick={closeForm}>Cancel</button>
                 </div>
               </form>
@@ -562,10 +566,10 @@ const Inventory = () => {
                         <td><StockBadge stock={p.stock} min={p.low_stock_alert} /></td>
                         <td>
                           <div className="actions">
-                            <button className="icon-btn" onClick={() => handleEdit(p)} title="Edit" aria-label={`Edit ${p.name}`}><Pencil size={16} strokeWidth={1.75} /></button>
+                            {canEdit && <button className="icon-btn" onClick={() => handleEdit(p)} title="Edit" aria-label={`Edit ${p.name}`}><Pencil size={16} strokeWidth={1.75} /></button>}
                             {canManageUnits && <button className="icon-btn" onClick={() => openUnitsModal(p)} title="Manage units" aria-label={`Manage units for ${p.name}`}><Layers size={16} strokeWidth={1.75} /></button>}
                             {canAdjustStock && <button className="icon-btn" onClick={() => openAdjustModal(p.id)} title="Adjust stock" aria-label={`Adjust stock for ${p.name}`}><Scale size={16} strokeWidth={1.75} /></button>}
-                            <button className="icon-btn danger" onClick={() => handleDelete(p)} title="Delete" aria-label={`Delete ${p.name}`}><Trash2 size={16} strokeWidth={1.75} /></button>
+                            {canDelete && <button className="icon-btn danger" onClick={() => handleDelete(p)} title="Delete" aria-label={`Delete ${p.name}`}><Trash2 size={16} strokeWidth={1.75} /></button>}
                           </div>
                         </td>
                       </tr>
@@ -776,7 +780,7 @@ const Inventory = () => {
                         {fmtTZS(u.selling_price)}{u.wholesale_price ? ` · Wholesale ${fmtTZS(u.wholesale_price)}` : ''}
                       </p>
                     </div>
-                    <button className="icon-btn danger" onClick={() => handleDeleteUnit(u)} title="Remove" aria-label={`Remove ${u.unit_name}`}><Trash2 size={16} strokeWidth={1.75} /></button>
+                    {hasPermission(user, 'inventory', 'delete') && <button className="icon-btn danger" onClick={() => handleDeleteUnit(u)} title="Remove" aria-label={`Remove ${u.unit_name}`}><Trash2 size={16} strokeWidth={1.75} /></button>}
                   </div>
                 ))}
               </div>

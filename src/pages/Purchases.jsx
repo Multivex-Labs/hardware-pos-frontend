@@ -3,10 +3,14 @@ import { PackagePlus, Banknote, Plus } from 'lucide-react'
 import { getPurchases, createPurchase, getProducts } from '../services/api'
 import toast from 'react-hot-toast'
 import Modal from '../components/Modal'
+import { useAuth } from '../context/AuthContext'
+import { hasPermission } from '../services/permissions'
 
 const fmtTZS = (v) => `TSh ${parseFloat(v || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 
 const Purchases = () => {
+  const { user } = useAuth()
+  const canCreate = hasPermission(user, 'purchases', 'create')
   const [purchases, setPurchases] = useState([])
   const [products, setProducts] = useState([])
   const [showForm, setShowForm] = useState(false)
@@ -44,9 +48,9 @@ const Purchases = () => {
           <h1>Purchases</h1>
           <p>Record purchases and update stock</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(true)}>
+        {canCreate && <button className="btn-primary" onClick={() => setShowForm(true)}>
           <Plus size={16} strokeWidth={2} /> New purchase
-        </button>
+        </button>}
       </div>
 
       <div className="stats-row">

@@ -14,16 +14,21 @@ import Purchases from '../../pages/Purchases'
 import Expenses from '../../pages/Expenses'
 import Procurement from '../../pages/Procurement'
 import DispensingRegister from '../../pages/DispensingRegister' // MPYA - Pharmacy
+import { hasPermission } from '../../services/permissions'
 
 const EXPANDED = 220
 const COLLAPSED = 72
 
-// Settings (biashara, watumiaji, data) inabaki kwa admin pekee.
-// Rangi/theme ni mapendeleo ya mtu binafsi: kila role anaipata kupitia menu ya mtumiaji (chini ya sidebar) → Appearance.
-const rolePages = {
-  admin:   ['/', '/sales', '/inventory', '/dispensing', '/purchases', '/procurement', '/expenses', '/clients', '/reports', '/settings'],
-  manager: ['/', '/sales', '/inventory', '/dispensing', '/purchases', '/procurement', '/expenses', '/clients', '/reports'],
-  cashier: ['/', '/sales', '/inventory', '/dispensing'],
+const pagePermissions = {
+  '/': 'dashboard',
+  '/sales': 'sales',
+  '/inventory': 'inventory',
+  '/dispensing': 'dispensing',
+  '/purchases': 'purchases',
+  '/procurement': 'procurement',
+  '/expenses': 'expenses',
+  '/clients': 'clients',
+  '/reports': 'reports'
 }
 
 // Hali ya sidebar inakumbukwa. Kama hakuna chaguo lililohifadhiwa, skrini ndogo (<1100px) inaanza ikiwa imefungwa.
@@ -41,7 +46,8 @@ const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)    // drawer ya simu
   const [collapsed, setCollapsed] = useState(readCollapsed) // rail ya desktop
   const role = user?.role || 'cashier'
-  const allowed = rolePages[role] || rolePages['cashier']
+  const allowed = Object.keys(pagePermissions).filter(path => hasPermission(user, pagePermissions[path]))
+  if (role === 'admin') allowed.push('/settings')
   const width = collapsed ? COLLAPSED : EXPANDED
 
   const navigate = (path) => {

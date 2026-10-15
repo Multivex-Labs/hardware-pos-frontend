@@ -4,33 +4,34 @@ import { createPortal } from 'react-dom'
 import { LayoutDashboard, ShoppingCart, Package, Pill, ClipboardList, PackageCheck, Receipt, Users, BarChart3, Settings, LogOut, PanelLeftClose, PanelLeftOpen, ChevronsUpDown, Palette, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { getBusinessSettings } from '../../services/api'
+import { hasPermission } from '../../services/permissions'
 import Modal from '../Modal'
 import ThemeSettings from '../ThemeSettings'
 
-// Nav imepangwa kwa makundi; roles na pharmacyOnly kama zamani.
+// Nav imepangwa kwa makundi; ruhusa huwekwa kwa kila mtumiaji.
 const navGroups = [
   {
     label: 'Operations', tkey: 'nav.operations',
     links: [
-      { name: 'Dashboard', tkey: 'nav.dashboard',  path: '/',           icon: LayoutDashboard, roles: ['admin', 'manager', 'cashier'] },
-      { name: 'Sales', tkey: 'nav.sales',      path: '/sales',      icon: ShoppingCart,    roles: ['admin', 'manager', 'cashier'] },
-      { name: 'Inventory', tkey: 'nav.inventory',  path: '/inventory',  icon: Package,         roles: ['admin', 'manager', 'cashier'] },
-      { name: 'Dispensing', tkey: 'nav.dispensing', path: '/dispensing', icon: Pill,            roles: ['admin', 'manager', 'cashier'], pharmacyOnly: true },
+      { name: 'Dashboard', tkey: 'nav.dashboard',  path: '/',           icon: LayoutDashboard, permission: 'dashboard' },
+      { name: 'Sales', tkey: 'nav.sales',      path: '/sales',      icon: ShoppingCart,    permission: 'sales' },
+      { name: 'Inventory', tkey: 'nav.inventory',  path: '/inventory',  icon: Package,         permission: 'inventory' },
+      { name: 'Dispensing', tkey: 'nav.dispensing', path: '/dispensing', icon: Pill,            permission: 'dispensing', pharmacyOnly: true },
     ],
   },
   {
     label: 'Purchasing', tkey: 'nav.purchasing',
     links: [
-      { name: 'Procurement', tkey: 'nav.procurement', path: '/procurement', icon: ClipboardList, roles: ['admin', 'manager'] },
-      { name: 'Purchases', tkey: 'nav.purchases',   path: '/purchases',   icon: PackageCheck,  roles: ['admin', 'manager'] },
+      { name: 'Procurement', tkey: 'nav.procurement', path: '/procurement', icon: ClipboardList, permission: 'procurement' },
+      { name: 'Purchases', tkey: 'nav.purchases',   path: '/purchases',   icon: PackageCheck,  permission: 'purchases' },
     ],
   },
   {
     label: 'Management', tkey: 'nav.management',
     links: [
-      { name: 'Expenses', tkey: 'nav.expenses', path: '/expenses', icon: Receipt,   roles: ['admin', 'manager'] },
-      { name: 'Clients', tkey: 'nav.clients',  path: '/clients',  icon: Users,     roles: ['admin', 'manager'] },
-      { name: 'Reports', tkey: 'nav.reports',  path: '/reports',  icon: BarChart3, roles: ['admin', 'manager'] },
+      { name: 'Expenses', tkey: 'nav.expenses', path: '/expenses', icon: Receipt,   permission: 'expenses' },
+      { name: 'Clients', tkey: 'nav.clients',  path: '/clients',  icon: Users,     permission: 'clients' },
+      { name: 'Reports', tkey: 'nav.reports',  path: '/reports',  icon: BarChart3, permission: 'reports' },
       { name: 'Settings', tkey: 'nav.settings', path: '/settings', icon: Settings,  roles: ['admin'] },
     ],
   },
@@ -49,7 +50,7 @@ const Sidebar = ({ activePage, setActivePage, collapsed = false, onToggle, onClo
   const [showAppearance, setShowAppearance] = useState(false)
 
   const groups = navGroups
-    .map(g => ({ ...g, links: g.links.filter(l => l.roles.includes(role) && (!l.pharmacyOnly || businessType === 'pharmacy')) }))
+    .map(g => ({ ...g, links: g.links.filter(l => hasPermission(user, l.permission) && (!l.pharmacyOnly || businessType === 'pharmacy')) }))
     .filter(g => g.links.length > 0)
 
   const loadFromApi = () => {

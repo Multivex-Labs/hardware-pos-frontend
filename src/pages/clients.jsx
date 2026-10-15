@@ -6,6 +6,8 @@ import {
   getClientDeposits, addClientDeposit
 } from '../services/api'
 import toast from 'react-hot-toast'
+import { useAuth } from '../context/AuthContext'
+import { hasPermission } from '../services/permissions'
 
 const emptyForm = { name: '', phone: '', email: '', address: '', credit_limit: '' }
 const emptyPayment = { amount: '', payment_method: 'cash', reference: '', notes: '' }
@@ -14,6 +16,10 @@ const depositTypeLabel = { deposit_in: 'Deposit received', deposit_used: 'Used f
 const fmtTZS = (v) => `TSh ${Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 
 const Clients = () => {
+  const { user } = useAuth()
+  const canCreate = hasPermission(user, 'clients', 'create')
+  const canEdit = hasPermission(user, 'clients', 'edit')
+  const canDelete = hasPermission(user, 'clients', 'delete')
   const [clients, setClients] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm)
@@ -214,9 +220,9 @@ const Clients = () => {
           <h1>Clients</h1>
           <p>Manage all your customers — {clients.length} clients</p>
         </div>
-        <button className="btn-primary" onClick={() => { setShowForm(true); setForm(emptyForm); setEditId(null) }}>
+        {canCreate && <button className="btn-primary" onClick={() => { setShowForm(true); setForm(emptyForm); setEditId(null) }}>
           <Plus size={16} strokeWidth={2} /> New client
-        </button>
+        </button>}
       </div>
 
       <div className="stats-row">
@@ -255,8 +261,8 @@ const Clients = () => {
                   <td><span className={`badge ${client.status === 'active' ? 'badge-success' : 'badge-danger'}`}>{client.status === 'active' ? 'Active' : 'Inactive'}</span></td>
                   <td onClick={e => e.stopPropagation()}>
                     <div className="actions">
-                      <button className="icon-btn" onClick={() => handleEdit(client)} title="Edit" aria-label={`Edit ${client.name}`}><Pencil size={16} strokeWidth={1.75} /></button>
-                      <button className="icon-btn danger" onClick={() => handleDelete(client.id)} title="Delete" aria-label={`Delete ${client.name}`}><Trash2 size={16} strokeWidth={1.75} /></button>
+                      {canEdit && <button className="icon-btn" onClick={() => handleEdit(client)} title="Edit" aria-label={`Edit ${client.name}`}><Pencil size={16} strokeWidth={1.75} /></button>}
+                      {canDelete && <button className="icon-btn danger" onClick={() => handleDelete(client.id)} title="Delete" aria-label={`Delete ${client.name}`}><Trash2 size={16} strokeWidth={1.75} /></button>}
                     </div>
                   </td>
                 </tr>
@@ -311,10 +317,10 @@ const Clients = () => {
                 </div>
 
                 <div style={{ padding: '0 20px 16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <button className="btn-primary btn-lg" style={{ flex: 1 }} onClick={() => { setShowDepositModal(true); setDepositForm(emptyDeposit) }}>
+                  {canCreate && <button className="btn-primary btn-lg" style={{ flex: 1 }} onClick={() => { setShowDepositModal(true); setDepositForm(emptyDeposit) }}>
                     <PiggyBank size={18} strokeWidth={1.75} /> Add deposit
-                  </button>
-                  {Number(profile.balance) > 0 && (
+                  </button>}
+                  {canCreate && Number(profile.balance) > 0 && (
                     <button className="btn-primary btn-lg" style={{ flex: 1 }} onClick={() => { setShowPaymentModal(true); setPaymentForm(emptyPayment) }}>
                       <HandCoins size={18} strokeWidth={1.75} /> Record payment
                     </button>
@@ -329,9 +335,9 @@ const Clients = () => {
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Credit limit</p>
                         <p className="mono" style={{ fontSize: '17px', fontWeight: '600' }}>{fmtTZS(profile.credit_limit)}</p>
                       </div>
-                      <button className="btn btn-sm" onClick={() => { setEditingCredit(!editingCredit); setNewCreditLimit(profile.credit_limit) }}>
+                      {canEdit && <button className="btn btn-sm" onClick={() => { setEditingCredit(!editingCredit); setNewCreditLimit(profile.credit_limit) }}>
                         {editingCredit ? 'Cancel' : <><Pencil size={14} strokeWidth={1.75} /> Edit</>}
-                      </button>
+                      </button>}
                     </div>
                     {editingCredit && (
                       <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>

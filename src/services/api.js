@@ -1,12 +1,32 @@
 import axios from 'axios'
 
+// Backend URL:
+// 1) VITE_API_URL ikiwekwa (mfano ngrok, au install ya local), inatumika kama kawaida.
+// 2) Production bila VITE_API_URL: '/api' (anwani ileile ya tovuti; server inapitisha /api kwenda backend).
+// 3) Development: http://localhost:5000/api
+const API_URL =
+  import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api')
+
+// Duka (tenant) kwenye development:
+// - Ukifungua http://demo.localhost:5173, duka ni "demo" (linachukuliwa kutoka anwani).
+// - Au weka VITE_TENANT=demo kwenye .env ya frontend.
+// Production: backend inasoma duka kutoka anwani ya tovuti (duka.multivex.co.tz), header haihitajiki.
+function detectTenant() {
+  const host = window.location.hostname
+  if (host.endsWith('.localhost')) return host.slice(0, -'.localhost'.length)
+  return import.meta.env.VITE_TENANT || null
+}
+
+const TENANT = detectTenant()
+
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+  baseURL: API_URL
 })
 
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) config.headers.Authorization = `Bearer ${token}`
+  if (TENANT) config.headers['X-Tenant'] = TENANT
   return config
 })
 
@@ -14,6 +34,13 @@ API.interceptors.request.use((config) => {
 export const login = (data) => API.post('/auth/login', data)
 export const register = (data) => API.post('/auth/register', data)
 export const getMe = () => API.get('/auth/me')
+export const getUsers = () => API.get('/auth/users')
+export const getRoles = () => API.get('/auth/roles')
+export const createRole = (data) => API.post('/auth/roles', data)
+export const updateRole = (name, permissions) => API.put(`/auth/roles/${encodeURIComponent(name)}`, { permissions })
+export const deleteRole = (name) => API.delete(`/auth/roles/${encodeURIComponent(name)}`)
+export const updateUserRole = (id, role) => API.put(`/auth/users/${id}/role`, { role })
+export const deleteUser = (id) => API.delete(`/auth/users/${id}`)
 
 // Audit Logs
 export const getAuditLogs = (limit = 200) => API.get(`/audit-logs?limit=${limit}`)

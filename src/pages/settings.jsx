@@ -1,7 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { Building2, Users, Palette, Database, Store, Wrench, Pill, TriangleAlert, Trash2, Upload, Download, FolderOpen, ImagePlus, RefreshCcw, Plus } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { register, getBusinessSettings, updateBusinessSettings } from '../services/api'
+import {
+  register, getBusinessSettings, updateBusinessSettings, getUsers, getRoles,
+  createRole, updateRole, deleteRole, updateUserRole, deleteUser
+} from '../services/api'
+import { PERMISSION_MODULES } from '../services/permissions'
 import toast from 'react-hot-toast'
 import axios from 'axios'
 import ThemeSettings from '../components/ThemeSettings'
@@ -32,6 +36,14 @@ const Settings = () => {
   const [usersLoading, setUsersLoading] = useState(false)
   const [userToDelete, setUserToDelete] = useState(null)
   const [deletingUser, setDeletingUser] = useState(false)
+  const [roles, setRoles] = useState([])
+  const [rolesLoading, setRolesLoading] = useState(false)
+  const [showRoles, setShowRoles] = useState(false)
+  const [showRoleEditor, setShowRoleEditor] = useState(false)
+  const [editingRole, setEditingRole] = useState(null)
+  const [roleDraft, setRoleDraft] = useState({ name: '', permissions: {} })
+  const [savingRole, setSavingRole] = useState(false)
+  const [changingRoleUser, setChangingRoleUser] = useState(null)
 
   const [bLoading, setBLoading] = useState(true)
   const [bSaving, setBSaving] = useState(false)
@@ -55,11 +67,21 @@ const Settings = () => {
 
   const loadUsers = () => {
     setUsersLoading(true)
-    API.get('/auth/users').then(r => setUsers(r.data)).catch(() => toast.error('Failed to load')).finally(() => setUsersLoading(false))
+    getUsers().then(r => setUsers(r.data)).catch(() => toast.error('Failed to load')).finally(() => setUsersLoading(false))
+  }
+
+  const loadRoles = () => {
+    setRolesLoading(true)
+    getRoles().then(r => setRoles(r.data)).catch(() => toast.error('Failed to load roles')).finally(() => setRolesLoading(false))
   }
 
   useEffect(() => { loadBiz() }, [])
-  useEffect(() => { if (activeTab === 'users') loadUsers() }, [activeTab])
+  useEffect(() => {
+    if (activeTab === 'users') {
+      loadUsers()
+      loadRoles()
+    }
+  }, [activeTab])
 
   const handleLogoUpload = (e) => {
     const file = e.target.files[0]; if (!file) return
@@ -91,9 +113,89 @@ const Settings = () => {
 
   const handleDeleteUser = async () => {
     if (!userToDelete) return; setDeletingUser(true)
-    try { await API.delete(`/auth/users/${userToDelete.id}`); toast.success(`${userToDelete.name} removed!`); setUserToDelete(null); loadUsers()
+    try { await deleteUser(userToDelete.id); toast.success(`${userToDelete.name} removed!`); setUserToDelete(null); loadUsers()
     } catch (err) { toast.error(err.response?.data?.message || 'Failed')
     } finally { setDeletingUser(false) }
+  }
+
+  const openRoleEditor = (role = null) => {
+    setEditingRole(role)
+    setRoleDraft({ name: role?.name || '', permissions: role?.permissions || {} })
+    setShowRoleEditor(true)
+  }
+
+  const setAllPermissions = (enabled) => {
+    setRoleDraft(current => ({
+      ...current,
+      permissions: enabled
+        ? Object.fromEntries(PERMISSION_MODULES.map(module => [module.id, module.actions]))
+        : {}
+    }))
+  }
+
+  const togglePermission = (moduleId, action, enabled) => {
+    setRoleDraft(current => {
+      const selected = new Set(current.permissions[moduleId] || [])
+      if (enabled) {
+        selected.add(action)
+        if (action !== 'view') selected.add('view')
+      } else if (action === 'view') {
+        selected.clear()
+      } else {
+        selected.delete(action)
+      }
+      const permissions = { ...current.permissions }
+      if (selected.size) permissions[moduleId] = [...selected]
+      else delete permissions[moduleId]
+      return { ...current, permissions }
+    })
+  }
+
+  const handleSaveRole = async (e) => {
+    e.preventDefault()
+    setSavingRole(true)
+    try {
+      if (editingRole) {
+        await updateRole(editingRole.name, roleDraft.permissions)
+        toast.success('Role permissions saved')
+      } else {
+        await createRole(roleDraft)
+        toast.success('Role created')
+      }
+      setEditingRole(null)
+      setRoleDraft({ name: '', permissions: {} })
+      setShowRoleEditor(false)
+      loadRoles()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save role')
+    } finally {
+      setSavingRole(false)
+    }
+  }
+
+  const handleDeleteRole = async (role) => {
+    if (!window.confirm(`Delete the "${role.name}" role?`)) return
+    try {
+      await deleteRole(role.name)
+      toast.success('Role deleted')
+      loadRoles()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete role')
+    }
+  }
+
+  const handleChangeUserRole = async (target, role) => {
+    setChangingRoleUser(target.id)
+    try {
+      await updateUserRole(target.id, role)
+      setUsers(current => current.map(u => u.id === target.id ? { ...u, role } : u))
+      toast.success(`${target.name}'s role updated`)
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update user role')
+      loadUsers()
+    } finally {
+      setChangingRoleUser(null)
+    }
   }
 
   const handleClearAll = async () => {
@@ -256,14 +358,17 @@ const Settings = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
               <div>
                 <h3 style={{ fontSize: '14px', fontWeight: '600' }}>Users</h3>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{users.length} total · only admins can create users</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{users.length} total · assign reusable access roles</span>
               </div>
-              <button className="btn-primary" onClick={() => setShowUserForm(true)}><Plus size={16} strokeWidth={2} /> Create user</button>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button className="btn" onClick={() => setShowRoles(true)}><Users size={16} /> Manage roles</button>
+                <button className="btn-primary" onClick={() => setShowUserForm(true)}><Plus size={16} strokeWidth={2} /> Create user</button>
+              </div>
             </div>
             {usersLoading ? loadingRow : (
               <div className="table-wrapper">
-                <table className="data-table" style={{ minWidth: '460px' }}>
-                  <thead><tr><th>User</th><th>Role</th><th style={{ width: '48px' }}></th></tr></thead>
+                <table className="data-table" style={{ minWidth: '560px' }}>
+                  <thead><tr><th>User</th><th>Assigned role</th><th style={{ width: '48px' }}></th></tr></thead>
                   <tbody>
                     {users.map(u => (
                       <tr key={u.id}>
@@ -276,7 +381,18 @@ const Settings = () => {
                             </div>
                           </div>
                         </td>
-                        <td>{roleBadge(u.role)}</td>
+                        <td>{u.role === 'admin'
+                          ? <>{roleBadge(u.role)} <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Full access</span></>
+                          : <select
+                              className="form-input"
+                              style={{ minWidth: '150px', maxWidth: '220px' }}
+                              value={u.role}
+                              disabled={changingRoleUser === u.id || u.id === user?.id}
+                              onChange={e => handleChangeUserRole(u, e.target.value)}
+                              aria-label={`Role for ${u.name}`}
+                            >
+                              {roles.filter(role => role.name !== 'admin').map(role => <option key={role.name} value={role.name}>{role.name}</option>)}
+                            </select>}</td>
                         <td>{u.id !== user?.id && <button className="icon-btn danger" onClick={() => setUserToDelete(u)} title="Remove user" aria-label={`Remove ${u.name}`}><Trash2 size={16} strokeWidth={1.75} /></button>}</td>
                       </tr>
                     ))}
@@ -286,11 +402,9 @@ const Settings = () => {
             )}
           </div>
 
-          <Modal open={showUserForm} onClose={() => setShowUserForm(false)} title="Create new user" subtitle="Choose a role that matches the person's job" size="md">
+          <Modal open={showUserForm} onClose={() => setShowUserForm(false)} title="Create new user" subtitle="Choose the role that matches this person's duties" size="md">
             <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '12px', marginBottom: '16px', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.8' }}>
-              <strong style={{ color: 'var(--text)' }}>Admin</strong> — Full access<br />
-              <strong style={{ color: 'var(--text)' }}>Manager</strong> — Sales, Inventory, Clients, Reports<br />
-              <strong style={{ color: 'var(--text)' }}>Cashier</strong> — Sales and Inventory only
+              Roles can be shared by multiple users. Create or edit reusable roles with Manage roles. Admin accounts are reserved and cannot be assigned here.
             </div>
             <form onSubmit={handleCreateUser}>
               {[['name', 'text', 'Full name'], ['email', 'email', 'Email'], ['password', 'password', 'Password']].map(([f, t, l]) => (
@@ -298,11 +412,106 @@ const Settings = () => {
               ))}
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Role</label>
-                <select className="form-input" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })}><option value="cashier">Cashier</option><option value="manager">Manager</option><option value="admin">Admin</option></select>
+                <select className="form-input" value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })} required>
+                  {roles.filter(role => role.name !== 'admin').map(role => <option key={role.name} value={role.name}>{role.name}</option>)}
+                </select>
               </div>
               <div className="modal-actions sticky">
                 <button type="button" className="btn" onClick={() => setShowUserForm(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={loading}>{loading ? 'Creating...' : 'Create user'}</button>
+              </div>
+            </form>
+          </Modal>
+
+          <Modal open={showRoles} onClose={() => setShowRoles(false)} title="Manage roles" subtitle="Create shared permission sets and assign them to multiple users." size="lg">
+            <div style={{ padding: '16px 20px 20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Admin is a reserved account role with full access. Other system roles can be customized.</p>
+                <button className="btn-primary" onClick={() => openRoleEditor()}><Plus size={16} /> Add role</button>
+              </div>
+              {rolesLoading ? loadingRow : (
+                <div className="table-wrapper">
+                  <table className="data-table" style={{ minWidth: '520px' }}>
+                    <thead><tr><th>Role</th><th>Users</th><th>Permissions</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {roles.filter(role => role.name !== 'admin').map(role => {
+                        const assigned = users.filter(u => u.role === role.name).length
+                        const permissionCount = Object.values(role.permissions || {}).reduce((total, actions) => total + actions.length, 0)
+                        return (
+                          <tr key={role.name}>
+                            <td style={{ fontWeight: '500' }}>{role.name}{role.system && <span className="badge badge-neutral" style={{ marginLeft: '6px' }}>Built-in</span>}</td>
+                            <td>{assigned}</td>
+                            <td>{permissionCount}</td>
+                            <td>
+                              <div className="actions">
+                                {role.name !== 'admin' && <>
+                                  <button className="btn btn-sm" onClick={() => openRoleEditor(role)}>Edit permissions</button>
+                                  {!role.system && <button className="icon-btn danger" onClick={() => handleDeleteRole(role)} disabled={assigned > 0} title={assigned ? 'Reassign all users before deleting' : 'Delete role'} aria-label={`Delete ${role.name}`}><Trash2 size={16} /></button>}
+                                </>}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </Modal>
+
+          <Modal
+            open={showRoleEditor}
+            onClose={() => { setShowRoleEditor(false); setEditingRole(null); setRoleDraft({ name: '', permissions: {} }) }}
+            title={editingRole ? `Edit role — ${editingRole.name}` : 'Create role'}
+            subtitle="Permissions affect access only; they do not turn POS features on or off."
+            size="xl"
+          >
+            <form onSubmit={handleSaveRole} style={{ padding: '16px 20px 20px' }}>
+              {!editingRole && (
+                <div className="form-group">
+                  <label className="form-label" htmlFor="new-role-name">Role name</label>
+                  <input id="new-role-name" className="form-input" value={roleDraft.name} onChange={e => setRoleDraft(current => ({ ...current, name: e.target.value }))} placeholder="e.g. Storekeeper" minLength={2} maxLength={40} required />
+                </div>
+              )}
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '14px', fontSize: '13px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={PERMISSION_MODULES.every(module => module.actions.every(action => roleDraft.permissions[module.id]?.includes(action)))}
+                  onChange={e => setAllPermissions(e.target.checked)}
+                />
+                Select all available permissions
+              </label>
+              <div className="table-wrapper">
+                <table className="data-table" style={{ minWidth: '560px' }}>
+                  <thead><tr><th>Page</th><th>View</th><th>Create</th><th>Edit</th><th>Delete</th></tr></thead>
+                  <tbody>
+                    {PERMISSION_MODULES.map(module => (
+                      <tr key={module.id}>
+                        <td style={{ fontWeight: '500' }}>{module.label}</td>
+                        {['view', 'create', 'edit', 'delete'].map(action => {
+                          const supported = module.actions.includes(action)
+                          const checked = roleDraft.permissions[module.id]?.includes(action) || false
+                          return (
+                            <td key={action} style={{ textAlign: 'center' }}>
+                              {supported && <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={action !== 'view' && !roleDraft.permissions[module.id]?.includes('view')}
+                                aria-label={`${module.label}: ${action}`}
+                                onChange={e => togglePermission(module.id, action, e.target.checked)}
+                              />}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="modal-actions sticky">
+                <button type="button" className="btn" onClick={() => { setShowRoleEditor(false); setEditingRole(null); setRoleDraft({ name: '', permissions: {} }) }}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={savingRole}>{savingRole ? 'Saving...' : editingRole ? 'Save role' : 'Create role'}</button>
               </div>
             </form>
           </Modal>

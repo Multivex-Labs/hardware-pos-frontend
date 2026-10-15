@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getProducts, getClients, createSale, getSales, getBusinessSettings, getAllProductUnits, getDepositHistory } from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { hasPermission } from '../services/permissions'
 import { useLanguage } from '../context/LanguageContext'
 import toast from 'react-hot-toast'
 import jsPDF from 'jspdf'
@@ -30,6 +31,8 @@ const StatusNote = ({ ok, title, children }) => (
 
 const Sales = () => {
   const { user } = useAuth()
+  const canCreateSale = hasPermission(user, 'sales', 'create')
+  const canManageSales = hasPermission(user, 'sales', 'edit')
   const { t } = useLanguage()
   // Labels mpya ambazo bado hazipo kwenye LanguageContext — zinatumia English hadi uziongeze
   const tr = (key, fallback) => { const v = t(key); return typeof v === 'string' && v && v !== key ? v : fallback }
@@ -366,7 +369,7 @@ const Sales = () => {
     } catch (err) { toast.error(err.response?.data?.message || 'Failed') } finally { setDepositLoading(false) }
   }
 
-  const canVoid = user?.role === 'admin' || user?.role === 'manager'
+  const canVoid = canManageSales
 
   // ── Edit Receipt (Admin/Manager) ──
   const [editTarget, setEditTarget] = useState(null)   // sale row inayohaririwa
@@ -670,13 +673,13 @@ const Sales = () => {
           <h1>{t('sales.title')}</h1>
           <p>{view === 'hub' ? t('sales.subtitleHub') : t('sales.subtitleActive')}</p>
         </div>
-        <button className="btn" onClick={() => setShowDepositForm(true)}><Plus size={16} strokeWidth={1.75} /> {t('sales.addDepositBtn')}</button>
+        {hasPermission(user, 'clients', 'create') && <button className="btn" onClick={() => setShowDepositForm(true)}><Plus size={16} strokeWidth={1.75} /> {t('sales.addDepositBtn')}</button>}
       </div>
 
       {/* HUB */}
       {view === 'hub' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-          {hubCards.map(c => {
+          {hubCards.filter(c => c.key !== 'new' || canCreateSale).map(c => {
             const Icon = c.icon
             return (
               <button key={c.key} className="hub-tile lift" onClick={() => setView(c.key)}>
