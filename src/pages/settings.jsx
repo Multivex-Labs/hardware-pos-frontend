@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { Building2, Users, Palette, Database, Store, Wrench, Pill, TriangleAlert, Trash2, Upload, Download, FolderOpen, ImagePlus, RefreshCcw, Plus } from 'lucide-react'
+import { Building2, Users, Palette, Database, Store, Wrench, Pill, TriangleAlert, Trash2, Upload, Download, FolderOpen, ImagePlus, RefreshCcw, Plus, KeyRound } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import {
   register, getBusinessSettings, updateBusinessSettings, getUsers, getRoles,
-  createRole, updateRole, deleteRole, updateUserRole, deleteUser
+  createRole, updateRole, deleteRole, updateUserRole, deleteUser, resetUserPassword
 } from '../services/api'
 import { PERMISSION_MODULES } from '../services/permissions'
 import toast from 'react-hot-toast'
@@ -35,6 +35,9 @@ const Settings = () => {
   const [users, setUsers] = useState([])
   const [usersLoading, setUsersLoading] = useState(false)
   const [userToDelete, setUserToDelete] = useState(null)
+  const [userToResetPassword, setUserToResetPassword] = useState(null)
+  const [temporaryPassword, setTemporaryPassword] = useState('')
+  const [resettingPassword, setResettingPassword] = useState(false)
   const [deletingUser, setDeletingUser] = useState(false)
   const [roles, setRoles] = useState([])
   const [rolesLoading, setRolesLoading] = useState(false)
@@ -95,7 +98,9 @@ const Settings = () => {
     if (!biz.business_name.trim()) { toast.error('Business name is required'); return }
     setBSaving(true)
     try {
-      await updateBusinessSettings(biz)
+      const editableSettings = { ...biz }
+      delete editableSettings.business_type
+      await updateBusinessSettings(editableSettings)
       localStorage.setItem('businessName', biz.business_name)
       localStorage.setItem('logoUrl', biz.logo)
       window.dispatchEvent(new Event('businessUpdated'))
@@ -116,6 +121,22 @@ const Settings = () => {
     try { await deleteUser(userToDelete.id); toast.success(`${userToDelete.name} removed!`); setUserToDelete(null); loadUsers()
     } catch (err) { toast.error(err.response?.data?.message || 'Failed')
     } finally { setDeletingUser(false) }
+  }
+
+  const handleResetUserPassword = async (event) => {
+    event.preventDefault()
+    if (!userToResetPassword) return
+    setResettingPassword(true)
+    try {
+      await resetUserPassword(userToResetPassword.id, temporaryPassword)
+      toast.success('Temporary password set. The user must change it at next login.')
+      setUserToResetPassword(null)
+      setTemporaryPassword('')
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to reset password')
+    } finally {
+      setResettingPassword(false)
+    }
   }
 
   const openRoleEditor = (role = null) => {
@@ -277,20 +298,21 @@ const Settings = () => {
               <>
                 <div className="card">
                   <h3 className="card-title" style={{ fontSize: '15px', marginBottom: '2px' }}>Business type</h3>
-                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '14px' }}>Determines which optional fields and pages appear across the system</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px' }}>
-                    {BUSINESS_TYPES.map(t => {
-                      const Icon = t.icon
-                      const active = biz.business_type === t.value
-                      return (
-                        <button key={t.value} type="button" className={`type-opt lift${active ? ' active' : ''}`} onClick={() => setBiz(b => ({ ...b, business_type: t.value }))} aria-pressed={active}>
-                          <Icon size={22} strokeWidth={1.75} style={{ color: active ? 'var(--primary)' : 'var(--text-muted)', marginBottom: '8px' }} />
-                          <div style={{ fontWeight: '600', fontSize: '14px', marginBottom: '2px' }}>{t.label}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>{t.desc}</div>
-                        </button>
-                      )
-                    })}
-                  </div>
+                  {(() => {
+                    const selectedType = BUSINESS_TYPES.find(type => type.value === biz.business_type) || BUSINESS_TYPES[0]
+                    const Icon = selectedType.icon
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <Icon size={22} strokeWidth={1.75} style={{ color: 'var(--primary)' }} />
+                        <div>
+                          <div style={{ fontWeight: '600', fontSize: '14px' }}>{selectedType.label}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                            {selectedType.desc}. This is set by Multivex Labs and cannot be changed here.
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
 
                 <div className="card">
@@ -368,7 +390,7 @@ const Settings = () => {
             {usersLoading ? loadingRow : (
               <div className="table-wrapper">
                 <table className="data-table" style={{ minWidth: '560px' }}>
-                  <thead><tr><th>User</th><th>Assigned role</th><th style={{ width: '48px' }}></th></tr></thead>
+                  <thead><tr><th>User</th><th>Assigned role</th><th style={{ width: '88px' }}>Actions</th></tr></thead>
                   <tbody>
                     {users.map(u => (
                       <tr key={u.id}>
@@ -393,7 +415,12 @@ const Settings = () => {
                             >
                               {roles.filter(role => role.name !== 'admin').map(role => <option key={role.name} value={role.name}>{role.name}</option>)}
                             </select>}</td>
-                        <td>{u.id !== user?.id && <button className="icon-btn danger" onClick={() => setUserToDelete(u)} title="Remove user" aria-label={`Remove ${u.name}`}><Trash2 size={16} strokeWidth={1.75} /></button>}</td>
+                        <td>
+                          {u.id !== user?.id && <div className="actions">
+                            <button className="icon-btn" onClick={() => { setUserToResetPassword(u); setTemporaryPassword('') }} title="Set temporary password" aria-label={`Reset password for ${u.name}`}><KeyRound size={16} strokeWidth={1.75} /></button>
+                            <button className="icon-btn danger" onClick={() => setUserToDelete(u)} title="Remove user" aria-label={`Remove ${u.name}`}><Trash2 size={16} strokeWidth={1.75} /></button>
+                          </div>}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -404,11 +431,11 @@ const Settings = () => {
 
           <Modal open={showUserForm} onClose={() => setShowUserForm(false)} title="Create new user" subtitle="Choose the role that matches this person's duties" size="md">
             <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '12px', marginBottom: '16px', fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.8' }}>
-              Roles can be shared by multiple users. Create or edit reusable roles with Manage roles. Admin accounts are reserved and cannot be assigned here.
+              Roles can be shared by multiple users. Create or edit reusable roles with Manage roles. Admin accounts are reserved and cannot be assigned here. The new user must change this temporary password on their first login.
             </div>
             <form onSubmit={handleCreateUser}>
-              {[['name', 'text', 'Full name'], ['email', 'email', 'Email'], ['password', 'password', 'Password']].map(([f, t, l]) => (
-                <div className="form-group" key={f}><label className="form-label">{l}</label><input className="form-input" type={t} value={newUser[f]} onChange={e => setNewUser({ ...newUser, [f]: e.target.value })} required placeholder={l} /></div>
+              {[['name', 'text', 'Full name'], ['email', 'email', 'Email'], ['password', 'password', 'Temporary password']].map(([f, t, l]) => (
+                <div className="form-group" key={f}><label className="form-label">{l}</label><input className="form-input" type={t} minLength={t === 'password' ? 8 : undefined} maxLength={t === 'password' ? 128 : undefined} value={newUser[f]} onChange={e => setNewUser({ ...newUser, [f]: e.target.value })} required placeholder={l} /></div>
               ))}
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Role</label>
@@ -419,6 +446,32 @@ const Settings = () => {
               <div className="modal-actions sticky">
                 <button type="button" className="btn" onClick={() => setShowUserForm(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={loading}>{loading ? 'Creating...' : 'Create user'}</button>
+              </div>
+            </form>
+          </Modal>
+
+          <Modal open={Boolean(userToResetPassword)} onClose={() => setUserToResetPassword(null)} title={`Set temporary password${userToResetPassword ? ` — ${userToResetPassword.name}` : ''}`} subtitle="Share it securely. The user will be required to change it after signing in." size="md">
+            <form onSubmit={handleResetUserPassword} style={{ padding: '16px 20px 20px' }}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="temporary-user-password">Temporary password</label>
+                <input
+                  id="temporary-user-password"
+                  className="form-input"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  maxLength={128}
+                  value={temporaryPassword}
+                  onChange={event => setTemporaryPassword(event.target.value)}
+                  required
+                />
+                <p className="form-hint">Use at least 8 characters.</p>
+              </div>
+              <div className="modal-actions sticky">
+                <button type="button" className="btn" onClick={() => setUserToResetPassword(null)}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={resettingPassword}>
+                  {resettingPassword ? 'Saving...' : 'Set temporary password'}
+                </button>
               </div>
             </form>
           </Modal>

@@ -5,6 +5,7 @@ export const PERMISSION_MODULES = [
   { id: 'sales', label: 'Sales', actions: ALL_ACTIONS },
   { id: 'inventory', label: 'Inventory', actions: ALL_ACTIONS },
   { id: 'dispensing', label: 'Dispensing', actions: ALL_ACTIONS },
+  { id: 'expiry', label: 'Expiry & batches', actions: ['view'] },
   { id: 'procurement', label: 'Procurement', actions: ALL_ACTIONS },
   { id: 'purchases', label: 'Purchases', actions: ALL_ACTIONS },
   { id: 'expenses', label: 'Expenses', actions: ALL_ACTIONS },
@@ -18,6 +19,7 @@ const DEFAULT_PERMISSIONS = {
     sales: ['view', 'create', 'edit'],
     inventory: ['view', 'edit'],
     dispensing: ['view', 'create'],
+    expiry: ['view'],
     procurement: ['view'],
     purchases: ['view'],
     expenses: ['view'],
@@ -28,7 +30,8 @@ const DEFAULT_PERMISSIONS = {
     dashboard: ['view'],
     sales: ['view', 'create'],
     inventory: ['view'],
-    dispensing: ['view', 'create']
+    dispensing: ['view', 'create'],
+    expiry: ['view']
   }
 }
 

@@ -1,12 +1,12 @@
 import { useLanguage } from '../../context/LanguageContext'
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { LayoutDashboard, ShoppingCart, Package, Pill, ClipboardList, PackageCheck, Receipt, Users, BarChart3, Settings, LogOut, PanelLeftClose, PanelLeftOpen, ChevronsUpDown, Palette, X } from 'lucide-react'
+import { LayoutDashboard, ShoppingCart, Package, Pill, ClipboardList, PackageCheck, Receipt, Users, BarChart3, Settings, LogOut, PanelLeftClose, PanelLeftOpen, ChevronsUpDown, Palette, X, KeyRound, CalendarClock, Boxes, FileText } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
-import { getBusinessSettings } from '../../services/api'
 import { hasPermission } from '../../services/permissions'
 import Modal from '../Modal'
 import ThemeSettings from '../ThemeSettings'
+import PasswordChangeForm from '../PasswordChangeForm'
 
 // Nav imepangwa kwa makundi; ruhusa huwekwa kwa kila mtumiaji.
 const navGroups = [
@@ -17,6 +17,9 @@ const navGroups = [
       { name: 'Sales', tkey: 'nav.sales',      path: '/sales',      icon: ShoppingCart,    permission: 'sales' },
       { name: 'Inventory', tkey: 'nav.inventory',  path: '/inventory',  icon: Package,         permission: 'inventory' },
       { name: 'Dispensing', tkey: 'nav.dispensing', path: '/dispensing', icon: Pill,            permission: 'dispensing', pharmacyOnly: true },
+      { name: 'Prescriptions', tkey: 'nav.prescriptions', path: '/pharmacy-prescriptions', icon: FileText, permission: 'dispensing', pharmacyOnly: true },
+      { name: 'Expiry & Batches', tkey: 'nav.expiry', path: '/expiry', icon: CalendarClock, permission: 'expiry', pharmacyOnly: true },
+      { name: 'Batch Management', tkey: 'nav.batches', path: '/pharmacy-batches', icon: Boxes, permission: 'inventory', pharmacyOnly: true },
     ],
   },
   {
@@ -38,37 +41,18 @@ const navGroups = [
 ]
 
 // collapsed = rail ya icons tu (desktop). onClose = kitufe cha X ndani ya drawer ya simu.
-const Sidebar = ({ activePage, setActivePage, collapsed = false, onToggle, onClose }) => {
+const Sidebar = ({ activePage, setActivePage, collapsed = false, onToggle, onClose, businessName, logoUrl, businessType }) => {
   const { t } = useLanguage()
   const { user, logout } = useAuth()
   const role = user?.role || 'cashier'
 
-  const [businessName, setBusinessName] = useState(localStorage.getItem('businessName') || '')
-  const [logoUrl, setLogoUrl] = useState(localStorage.getItem('logoUrl') || '')
-  const [businessType, setBusinessType] = useState(localStorage.getItem('businessType') || 'general')
   const [menuPos, setMenuPos] = useState(null)
   const [showAppearance, setShowAppearance] = useState(false)
+  const [showPasswordChange, setShowPasswordChange] = useState(false)
 
   const groups = navGroups
     .map(g => ({ ...g, links: g.links.filter(l => hasPermission(user, l.permission) && (!l.pharmacyOnly || businessType === 'pharmacy')) }))
     .filter(g => g.links.length > 0)
-
-  const loadFromApi = () => {
-    getBusinessSettings()
-      .then(res => {
-        const s = res.data || {}
-        if (s.business_name) { setBusinessName(s.business_name); localStorage.setItem('businessName', s.business_name) }
-        if (s.logo !== undefined) { setLogoUrl(s.logo || ''); localStorage.setItem('logoUrl', s.logo || '') }
-        if (s.business_type) { setBusinessType(s.business_type); localStorage.setItem('businessType', s.business_type) }
-      })
-      .catch(() => {})
-  }
-
-  useEffect(() => {
-    loadFromApi()
-    window.addEventListener('businessUpdated', loadFromApi)
-    return () => window.removeEventListener('businessUpdated', loadFromApi)
-  }, [])
 
   useEffect(() => {
     if (!menuPos) return
@@ -211,6 +195,9 @@ const Sidebar = ({ activePage, setActivePage, collapsed = false, onToggle, onClo
             <button className="menu-item" role="menuitem" onClick={() => { setMenuPos(null); setShowAppearance(true); onClose && onClose() }}>
               <Palette size={17} strokeWidth={1.75} /> {t('shell.appearance')}
             </button>
+            <button className="menu-item" role="menuitem" onClick={() => { setMenuPos(null); setShowPasswordChange(true); onClose && onClose() }}>
+              <KeyRound size={17} strokeWidth={1.75} /> Change password
+            </button>
             <button className="menu-item danger" role="menuitem" onClick={logout}>
               <LogOut size={17} strokeWidth={1.75} /> {t('shell.logout')}
             </button>
@@ -221,6 +208,9 @@ const Sidebar = ({ activePage, setActivePage, collapsed = false, onToggle, onClo
 
       <Modal open={showAppearance} onClose={() => setShowAppearance(false)} title={t('shell.appearance')} subtitle={t('shell.appearanceSub')} size="md" dismissOnOverlay>
         <ThemeSettings />
+      </Modal>
+      <Modal open={showPasswordChange} onClose={() => setShowPasswordChange(false)} title="Change password" subtitle="Choose a new password for your account." size="md">
+        <PasswordChangeForm onCancel={() => setShowPasswordChange(false)} onSuccess={() => setShowPasswordChange(false)} />
       </Modal>
     </div>
   )

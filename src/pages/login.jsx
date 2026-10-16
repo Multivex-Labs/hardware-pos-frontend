@@ -11,6 +11,7 @@ const Login = () => {
   const [form, setForm] = useState({ email: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [showForgotPasswordHelp, setShowForgotPasswordHelp] = useState(false)
   const [biz, setBiz] = useState({ business_name: '', motto: '', logo: '', address: '', phone: '' })
 
   useEffect(() => {
@@ -136,6 +137,30 @@ const Login = () => {
                 {loading ? t('login.signingIn') : t('login.signIn')}
               </button>
             </form>
+            <div style={{ marginTop: '16px', textAlign: 'center' }}>
+              <button
+                type="button"
+                className="btn"
+                aria-expanded={showForgotPasswordHelp}
+                aria-controls="forgot-password-help"
+                onClick={() => setShowForgotPasswordHelp(open => !open)}
+                style={{ border: 0, background: 'transparent', color: 'var(--primary)', padding: '4px 8px', fontSize: '13px' }}
+              >
+                Forgot your password?
+              </button>
+              {showForgotPasswordHelp && (
+                <div
+                  id="forgot-password-help"
+                  role="region"
+                  aria-label="Forgot password instructions"
+                  style={{ marginTop: '8px', padding: '12px', borderRadius: '8px', background: 'var(--surface-2)', border: '1px solid var(--border)', textAlign: 'left', fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6 }}
+                >
+                  <p style={{ fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>How to get back into your account</p>
+                  <p>If you are a staff member, contact your business administrator. They can set a temporary password from Settings → Users. Sign in with it, then choose a new password.</p>
+                  <p style={{ marginTop: '8px' }}>If you are the administrator, contact your POS provider to verify your account and reset your password. Do not share your current password with anyone.</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

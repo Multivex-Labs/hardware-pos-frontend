@@ -13,6 +13,7 @@ import Returns from './Returns.jsx'
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 const fmtTZS = (v) => `TSh ${parseFloat(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtNum = (v) => parseFloat(v || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })
+const createRequestKey = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
 // Search input yenye icon — iko nje ya Sales ili isi-remount kila render (focus haipotei)
 const SearchInput = ({ style, inputRef, ...props }) => (
@@ -50,6 +51,7 @@ const Sales = () => {
   const [amountReceived, setAmountReceived] = useState('')
   const [discount, setDiscount] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [saleRequestKey, setSaleRequestKey] = useState(createRequestKey)
 
   const [view, setView] = useState('hub')
   const [saleMode, setSaleMode] = useState('cash')
@@ -63,12 +65,15 @@ const Sales = () => {
   const [depositForm, setDepositForm] = useState({ client_id: '', amount: '', payment_method: 'cash', reference: '' })
   const [depositLoading, setDepositLoading] = useState(false)
   const [depositTxns, setDepositTxns] = useState([]) // deposit ledger (amana zote: zilizowekwa + zilizotumika)
+  const availableStock = (product) => Number(product?.eligible_stock ?? product?.stock ?? 0)
+  const requiresDispensing = (product) => businessType === 'pharmacy' && (Boolean(product?.requires_prescription) || ['prescription', 'controlled'].includes(product?.drug_category))
   const [voidTarget, setVoidTarget] = useState(null)
   const [voidReason, setVoidReason] = useState('')
   const [voidLoading, setVoidLoading] = useState(false)
   const [heldSales, setHeldSales] = useState([])
   const [showHeldModal, setShowHeldModal] = useState(false)
   const [biz, setBiz] = useState({ business_name: 'PIUS HARDWARE', address: 'P.O.BOX 4629, MBEYA TANZANIA', phone: '0764067682', motto: 'JENGA NA PIUS HARDWARE', logo: '' })
+  const [businessType, setBusinessType] = useState(localStorage.getItem('businessType') || 'general')
 
   const searchRef = useRef(null)
   const qtyRef = useRef(null)
@@ -76,7 +81,7 @@ const Sales = () => {
   useEffect(() => {
     loadData()
     try { setHeldSales(JSON.parse(localStorage.getItem('held_sales') || '[]')) } catch { setHeldSales([]) }
-    getBusinessSettings().then(r => { const s = r.data || {}; setBiz(prev => ({ business_name: s.business_name || prev.business_name, address: s.address || prev.address, phone: s.phone || prev.phone, motto: s.motto || prev.motto, logo: s.logo || '' })) }).catch(() => {})
+    getBusinessSettings().then(r => { const s = r.data || {}; setBusinessType(s.business_type || 'general'); setBiz(prev => ({ business_name: s.business_name || prev.business_name, address: s.address || prev.address, phone: s.phone || prev.phone, motto: s.motto || prev.motto, logo: s.logo || '' })) }).catch(() => {})
   }, [])
 
   // Credit/Deposit lazima ziwe na registered client - walk-in haitumiki huko
@@ -121,11 +126,12 @@ const Sales = () => {
 
   // Njia ya haraka (scanner): ongeza 1 retail moja kwa moja
   const addToCart = (product) => {
-    if (product.stock < 1) { toast.error(`${product.name} ${t('sales.outOfStock')}`); return }
+    if (requiresDispensing(product)) { toast.error(`${product.name} requires prescription dispensing. Open the Dispensing Register.`); return }
+    if (availableStock(product) < 1) { toast.error(`${product.name} ${t('sales.outOfStock')}`); return }
     const existing = cart.find(i => i.product_id === product.id)
     if (existing) {
       const unit = getCurrentUnit(existing)
-      const maxQty = Math.floor(product.stock / unit.conversion_factor)
+      const maxQty = Math.floor(availableStock(product) / unit.conversion_factor)
       if (existing.quantity >= maxQty) { toast.error(t('sales.onlyAvailable')(maxQty)); return }
       setCart(cart.map(i => i.product_id === product.id ? { ...i, quantity: i.quantity + 1 } : i))
     } else {
@@ -142,7 +148,7 @@ const Sales = () => {
     const item = cart.find(i => i.product_id === pid)
     const product = products.find(p => p.id === pid)
     const unit = getCurrentUnit(item)
-    const maxQty = Math.floor((product?.stock || 0) / unit.conversion_factor)
+    const maxQty = Math.floor(availableStock(product) / unit.conversion_factor)
     if (q > maxQty) { toast.error(t('sales.onlyAvailable')(maxQty)); return }
     setCart(cart.map(i => i.product_id === pid ? { ...i, quantity: q } : i))
   }
@@ -155,7 +161,7 @@ const Sales = () => {
     setCart(cart.map(i => {
       if (i.product_id !== pid) return i
       const unit = i.units.find(u => u.id === unitId) || i.units[0]
-      const maxQty = Math.max(Math.floor((product?.stock || 0) / unit.conversion_factor), 1)
+      const maxQty = Math.max(Math.floor(availableStock(product) / unit.conversion_factor), 1)
       return { ...i, selectedUnitId: unit.id, price_type: 'retail', price: unit.selling_price, quantity: Math.min(i.quantity, maxQty) }
     }))
   }
@@ -185,7 +191,8 @@ const Sales = () => {
   const focusSearch = () => setTimeout(() => searchRef.current?.focus(), 0)
 
   const selectProduct = (product) => {
-    if (Number(product.stock) < 1) { toast.error(`${product.name} ${t('sales.outOfStock')}`); return }
+    if (requiresDispensing(product)) { toast.error(`${product.name} requires prescription dispensing. Open the Dispensing Register.`); return }
+    if (availableStock(product) < 1) { toast.error(`${product.name} ${t('sales.outOfStock')}`); return }
     setEntry({ product, units: buildUnits(product), unitId: null, priceType: 'retail', qty: '1', customPrice: '' })
     setSearchQuery(''); setShowResults(false); setActiveIdx(0)
     setTimeout(() => qtyRef.current?.select(), 0)
@@ -200,12 +207,12 @@ const Sales = () => {
     : entryUnit.selling_price
   const entryQty = entry ? (parseInt(entry.qty) || 0) : 0
   const entryAmount = entryPrice * entryQty
-  const entryMax = entry ? Math.floor(Number(entry.product.stock) / entryUnit.conversion_factor) : 0
+  const entryMax = entry ? Math.floor(availableStock(entry.product) / entryUnit.conversion_factor) : 0
 
   const changeEntryUnit = (unitIdRaw) => {
     const unitId = unitIdRaw === '' ? null : parseInt(unitIdRaw)
     const unit = entry.units.find(u => u.id === unitId) || entry.units[0]
-    const max = Math.max(Math.floor(Number(entry.product.stock) / unit.conversion_factor), 1)
+    const max = Math.max(Math.floor(availableStock(entry.product) / unit.conversion_factor), 1)
     setEntry({ ...entry, unitId: unit.id, priceType: 'retail', customPrice: '', qty: String(Math.min(parseInt(entry.qty) || 1, max)) })
   }
 
@@ -261,7 +268,7 @@ const Sales = () => {
   const creditOk = saleMode === 'credit' ? (selectedClientData ? finalTotal <= availableCredit : false) : true
   const depositOk = saleMode === 'deposit' ? (selectedClientData ? finalTotal <= availableDeposit : false) : true
 
-  const resetCart = () => { setCart([]); setEntry(null); setSelectedClient(''); setSelectedClientData(null); setWalkinName(''); setCustomerType('registered'); setDiscount(0); setPaymentMethod('cash'); setAmountReceived('') }
+  const resetCart = () => { setCart([]); setEntry(null); setSelectedClient(''); setSelectedClientData(null); setWalkinName(''); setCustomerType('registered'); setDiscount(0); setPaymentMethod('cash'); setAmountReceived(''); setSaleRequestKey(createRequestKey()) }
 
   // cart items hazina .unit ya moja kwa moja — tunaiandaa kabla ya receipt/payload
   const cartForPayload = () => cart.map(i => ({
@@ -319,6 +326,7 @@ const Sales = () => {
     setLoading(true)
     try {
       const res = await createSale({
+        request_key: saleRequestKey,
         client_id: customerType === 'registered' ? (selectedClient || null) : null,
         walkin_name: customerType === 'walkin' ? (walkinName || null) : null,
         payment_method: paymentMethod,
@@ -340,7 +348,7 @@ const Sales = () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const res = await axios.post(`${API_URL}/sales/credit`, { client_id: selectedClient, discount: parseFloat(discount || 0), items: cartForPayload() }, { headers: { Authorization: `Bearer ${token}` } })
+      const res = await axios.post(`${API_URL}/sales/credit`, { request_key: saleRequestKey, client_id: selectedClient, discount: parseFloat(discount || 0), items: cartForPayload() }, { headers: { Authorization: `Bearer ${token}` } })
       setLastSale({ saleId: res.data.saleId, total: finalTotal, discount: parseFloat(discount || 0), saleMode: 'credit', items: cartForReceipt(), cashierName: user?.name, clientName: selectedClientData?.name, new_balance: res.data.new_balance })
       toast.success(res.data.message); resetCart(); loadData()
     } catch (err) { toast.error(err.response?.data?.message || 'Failed') } finally { setLoading(false) }
@@ -352,7 +360,7 @@ const Sales = () => {
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const res = await axios.post(`${API_URL}/sales/deposit-sale`, { client_id: selectedClient, discount: parseFloat(discount || 0), items: cartForPayload() }, { headers: { Authorization: `Bearer ${token}` } })
+      const res = await axios.post(`${API_URL}/sales/deposit-sale`, { request_key: saleRequestKey, client_id: selectedClient, discount: parseFloat(discount || 0), items: cartForPayload() }, { headers: { Authorization: `Bearer ${token}` } })
       setLastSale({ saleId: res.data.saleId, total: finalTotal, discount: parseFloat(discount || 0), saleMode: 'deposit', items: cartForReceipt(), cashierName: user?.name, clientName: selectedClientData?.name, remaining_deposit: res.data.remaining_deposit })
       toast.success(res.data.message); resetCart(); loadData()
     } catch (err) { toast.error(err.response?.data?.message || 'Failed') } finally { setLoading(false) }
@@ -738,8 +746,9 @@ const Sales = () => {
                     {results.length === 0
                       ? <p style={{ padding: '16px', textAlign: 'center', fontSize: '13px', color: 'var(--text-subtle)' }}>{t('sales.productNotFound')}</p>
                       : results.map((p, idx) => {
-                          const out = Number(p.stock) < 1
-                          const low = !out && Number(p.stock) <= Number(p.low_stock_alert)
+                          const available = availableStock(p)
+                          const out = available < 1
+                          const low = !out && available <= Number(p.low_stock_alert)
                           const altCount = (unitsByProduct[p.id] || []).length
                           return (
                             <button key={p.id} type="button" disabled={out} className={`result-row${idx === activeIdx ? ' active' : ''}`}
@@ -749,7 +758,7 @@ const Sales = () => {
                                 {p.category && <span style={{ marginLeft: '8px', fontSize: '12px', fontWeight: '400', color: 'var(--text-muted)' }}>{p.category}</span>}
                                 {altCount > 0 && <span className="badge badge-neutral" style={{ marginLeft: '8px' }}>+{altCount}</span>}
                               </span>
-                              <span style={{ fontSize: '12px', color: out ? 'var(--danger)' : 'var(--text-muted)', whiteSpace: 'nowrap' }} className="mono">{p.stock} {p.unit || 'PC'}</span>
+                              <span style={{ fontSize: '12px', color: out ? 'var(--danger)' : 'var(--text-muted)', whiteSpace: 'nowrap' }} className="mono">{available} available {p.unit || 'PC'}</span>
                               {out && <span className="badge badge-out">Out</span>}
                               {low && <span className="badge badge-low">Low</span>}
                               <span className="mono" style={{ minWidth: '84px', textAlign: 'right', fontWeight: '600' }}>{fmtNum(p.price)}</span>
@@ -771,7 +780,7 @@ const Sales = () => {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ fontWeight: '600', fontSize: '15px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.product.name}</p>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                          {tr('sales.entry.inStock', 'In stock')}: <span className="mono">{entry.product.stock} {entry.product.unit || 'PC'}</span>
+                          {tr('sales.entry.inStock', 'In stock')}: <span className="mono">{availableStock(entry.product)} {entry.product.unit || 'PC'}</span>
                           {entryUnit.conversion_factor !== 1 && <span className="mono"> · max {entryMax} {entryUnit.unit_name}</span>}
                         </p>
                       </div>

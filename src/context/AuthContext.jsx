@@ -19,6 +19,14 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
+  useEffect(() => {
+    const requirePasswordChange = () => {
+      setUser(current => current ? { ...current, must_change_password: true } : current)
+    }
+    window.addEventListener('passwordChangeRequired', requirePasswordChange)
+    return () => window.removeEventListener('passwordChangeRequired', requirePasswordChange)
+  }, [])
+
   const login = (token, userData) => {
     localStorage.setItem('token', token)
     setUser(userData)
@@ -29,8 +37,12 @@ export const AuthProvider = ({ children }) => {
     setUser(null)
   }
 
+  const updateUser = (updates) => {
+    setUser(current => current ? { ...current, ...updates } : current)
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

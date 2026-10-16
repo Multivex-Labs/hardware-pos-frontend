@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { Factory, ClipboardList, PackageCheck, Wallet, Plus, Trash2, HandCoins, Info } from 'lucide-react'
-import { getProducts } from '../services/api'
+import { getProducts, getBusinessSettings } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { hasPermission } from '../services/permissions'
 import toast from 'react-hot-toast'
@@ -31,6 +31,7 @@ const Procurement = () => {
   const [pos, setPos] = useState([])
   const [grns, setGrns] = useState([])
   const [products, setProducts] = useState([])
+  const [isPharmacy, setIsPharmacy] = useState(false)
   const [showVendorForm, setShowVendorForm] = useState(false)
   const [vendorForm, setVendorForm] = useState({ name: '', contact_person: '', phone: '', email: '', address: '', notes: '' })
   const [vendorLoading, setVendorLoading] = useState(false)
@@ -49,7 +50,10 @@ const Procurement = () => {
   const [payMethod, setPayMethod] = useState('cash')
   const [payLoading, setPayLoading] = useState(false)
 
-  useEffect(() => { loadAll(); getProducts().then(r => setProducts(r.data)).catch(() => {}) }, [])
+  useEffect(() => {
+    loadAll(); getProducts().then(r => setProducts(r.data)).catch(() => {})
+    getBusinessSettings().then(r => setIsPharmacy(r.data?.business_type === 'pharmacy')).catch(() => {})
+  }, [])
 
   const loadAll = () => {
     api().get('/procurement/vendors').then(r => setVendors(r.data)).catch(() => {})
@@ -114,6 +118,7 @@ const Procurement = () => {
     e.preventDefault()
     const validItems = grnItems.filter(i => parseFloat(i.quantity_received) > 0)
     if (!validItems.length) { toast.error('Enter the quantity received'); return }
+    if (isPharmacy && validItems.some(i => !i.batch_number?.trim() || !i.expiry_date)) { toast.error('Enter a batch number and expiry date for each medicine'); return }
     if (grnForm.payment_type === 'credit' && !selectedPO && !grnForm.vendor_id) { toast.error('Select a vendor for credit purchases'); return }
     const total = validItems.reduce((s, i) => s + (parseFloat(i.quantity_received || 0) * parseFloat(i.unit_cost || 0)), 0)
     if (grnForm.payment_type === 'credit' && parseFloat(grnForm.amount_paid || 0) > total) { toast.error('Amount paid cannot exceed the purchase total'); return }
@@ -126,7 +131,7 @@ const Procurement = () => {
         amount_paid: grnForm.payment_type === 'credit' ? parseFloat(grnForm.amount_paid || 0) : undefined,
         received_date: grnForm.received_date,
         notes: grnForm.notes,
-        items: validItems.map(i => ({ product_id: i.product_id, product_name: i.product_name, quantity_received: parseFloat(i.quantity_received), unit_cost: parseFloat(i.unit_cost) }))
+        items: validItems.map(i => ({ product_id: i.product_id, product_name: i.product_name, quantity_received: parseFloat(i.quantity_received), unit_cost: parseFloat(i.unit_cost), batch_number: i.batch_number, expiry_date: i.expiry_date, manufacture_date: i.manufacture_date }))
       })
       toast.success(res.data.message); setShowGRNForm(false); setSelectedPO(null); loadAll()
     } catch (err) { toast.error(err.response?.data?.message || 'Failed') } finally { setGrnLoading(false) }
@@ -309,6 +314,11 @@ const Procurement = () => {
                         <input className="form-input mono" style={{ height: '34px' }} type="number" value={item.unit_cost} onChange={e => updateGRNItem(i, { unit_cost: e.target.value })} placeholder="0" min="0" step="0.01" />
                         <span className="mono" style={{ textAlign: 'right', fontWeight: '500' }}>{fmt(lineAmount(item.quantity_received, item.unit_cost))}</span>
                         {!selectedPO && <button type="button" className="icon-btn danger" onClick={() => setGrnItems(grnItems.filter((_, idx) => idx !== i))} disabled={grnItems.length === 1} aria-label="Remove item"><Trash2 size={16} strokeWidth={1.75} /></button>}
+                        {isPharmacy && <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(120px, 1fr))', gap: 8 }}>
+                          <input className="form-input" aria-label="Batch number" value={item.batch_number || ''} onChange={e => updateGRNItem(i, { batch_number: e.target.value })} placeholder="Batch / lot number *" required />
+                          <input className="form-input" aria-label="Expiry date" type="date" value={item.expiry_date || ''} onChange={e => updateGRNItem(i, { expiry_date: e.target.value })} required />
+                          <input className="form-input" aria-label="Manufacture date" type="date" value={item.manufacture_date || ''} onChange={e => updateGRNItem(i, { manufacture_date: e.target.value })} title="Manufacture date (optional)" />
+                        </div>}
                       </div>
                     ))}
                   </div>

@@ -30,16 +30,28 @@ API.interceptors.request.use((config) => {
   return config
 })
 
+API.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response?.data?.code === 'PASSWORD_CHANGE_REQUIRED') {
+      window.dispatchEvent(new Event('passwordChangeRequired'))
+    }
+    return Promise.reject(error)
+  }
+)
+
 // Auth
 export const login = (data) => API.post('/auth/login', data)
 export const register = (data) => API.post('/auth/register', data)
 export const getMe = () => API.get('/auth/me')
+export const changePassword = (data) => API.put('/auth/password', data)
 export const getUsers = () => API.get('/auth/users')
 export const getRoles = () => API.get('/auth/roles')
 export const createRole = (data) => API.post('/auth/roles', data)
 export const updateRole = (name, permissions) => API.put(`/auth/roles/${encodeURIComponent(name)}`, { permissions })
 export const deleteRole = (name) => API.delete(`/auth/roles/${encodeURIComponent(name)}`)
 export const updateUserRole = (id, role) => API.put(`/auth/users/${id}/role`, { role })
+export const resetUserPassword = (id, temporaryPassword) => API.put(`/auth/users/${id}/password`, { temporaryPassword })
 export const deleteUser = (id) => API.delete(`/auth/users/${id}`)
 
 // Audit Logs
@@ -54,6 +66,15 @@ export const updateProduct = (id, data) => API.put(`/products/${id}`, data)
 export const deleteProduct = (id) => API.delete(`/products/${id}`)
 export const getLowStock = () => API.get('/products/lowstock')
 export const getExpiringSoon = (days = 30) => API.get(`/products/expiring-soon?days=${days}`) // MPYA - Pharmacy
+export const getPharmacyBatches = (params = {}) => API.get('/pharmacy/batches', { params })
+export const getPharmacyExpirySummary = () => API.get('/pharmacy/expiry-summary')
+export const adjustPharmacyBatch = (id, data) => API.post(`/pharmacy/batches/${id}/adjustment`, data)
+export const updatePharmacyBatchStatus = (id, data) => API.patch(`/pharmacy/batches/${id}/status`, data)
+export const updatePharmacyBatchInfo = (id, data) => API.put(`/pharmacy/batches/${id}`, data)
+export const getPharmacyBatchMovements = (id) => API.get(`/pharmacy/batches/${id}/movements`)
+export const getEligiblePharmacyBatches = (productId) => API.get('/pharmacy/eligible-batches', { params: { product_id: productId } })
+export const getPharmacyPrescriptions = (params = {}) => API.get('/pharmacy/prescriptions', { params })
+export const createPharmacyPrescription = (data) => API.post('/pharmacy/prescriptions', data)
 
 // Product Units (Unit Conversion / Item Packages)
 export const getAllProductUnits = () => API.get('/products/units/all')

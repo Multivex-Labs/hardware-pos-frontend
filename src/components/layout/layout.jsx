@@ -1,5 +1,5 @@
 import { useLanguage } from '../../context/LanguageContext'
-import { useState, useEffect } from 'react'
+import { memo, useState, useEffect } from 'react'
 import { Menu } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -14,6 +14,10 @@ import Purchases from '../../pages/Purchases'
 import Expenses from '../../pages/Expenses'
 import Procurement from '../../pages/Procurement'
 import DispensingRegister from '../../pages/DispensingRegister' // MPYA - Pharmacy
+import ExpiryTracker from '../../pages/ExpiryTracker'
+import PharmacyBatches from '../../pages/PharmacyBatches'
+import PharmacyPrescriptions from '../../pages/PharmacyPrescriptions'
+import { getBusinessSettings } from '../../services/api'
 import { hasPermission } from '../../services/permissions'
 
 const EXPANDED = 220
@@ -24,12 +28,35 @@ const pagePermissions = {
   '/sales': 'sales',
   '/inventory': 'inventory',
   '/dispensing': 'dispensing',
+  '/expiry': 'expiry',
+  '/pharmacy-batches': 'inventory',
+  '/pharmacy-prescriptions': 'dispensing',
   '/purchases': 'purchases',
   '/procurement': 'procurement',
   '/expenses': 'expenses',
   '/clients': 'clients',
   '/reports': 'reports'
 }
+
+const pageComponents = {
+  '/': Dashboard,
+  '/sales': Sales,
+  '/inventory': Inventory,
+  '/dispensing': DispensingRegister,
+  '/expiry': ExpiryTracker,
+  '/pharmacy-batches': PharmacyBatches,
+  '/pharmacy-prescriptions': PharmacyPrescriptions,
+  '/purchases': Purchases,
+  '/procurement': Procurement,
+  '/expenses': Expenses,
+  '/clients': Clients,
+  '/reports': Reports,
+  '/settings': Settings
+}
+
+const KeepAlivePage = memo(function KeepAlivePage({ component: Page, active }) {
+  return <div hidden={!active}><Page /></div>
+})
 
 // Hali ya sidebar inakumbukwa. Kama hakuna chaguo lililohifadhiwa, skrini ndogo (<1100px) inaanza ikiwa imefungwa.
 const readCollapsed = () => {
@@ -43,15 +70,39 @@ const Layout = () => {
   const { user } = useAuth()
   const { colors } = useTheme()
   const [activePage, setActivePage] = useState('/')
+  const [visitedPages, setVisitedPages] = useState(['/'])
   const [sidebarOpen, setSidebarOpen] = useState(false)    // drawer ya simu
   const [collapsed, setCollapsed] = useState(readCollapsed) // rail ya desktop
+  const [businessName, setBusinessName] = useState(localStorage.getItem('businessName') || 'POS')
+  const [logoUrl, setLogoUrl] = useState(localStorage.getItem('logoUrl') || '')
+  const [businessType, setBusinessType] = useState(localStorage.getItem('businessType') || 'general')
   const role = user?.role || 'cashier'
-  const allowed = Object.keys(pagePermissions).filter(path => hasPermission(user, pagePermissions[path]))
+  useEffect(() => {
+    const loadBusiness = () => getBusinessSettings().then(r => {
+      const name = r.data?.business_name || 'POS'
+      const type = r.data?.business_type || 'general'
+      const logo = r.data?.logo || ''
+      setBusinessName(name)
+      setLogoUrl(logo)
+      setBusinessType(type)
+      localStorage.setItem('businessName', name)
+      localStorage.setItem('logoUrl', logo)
+      localStorage.setItem('businessType', type)
+    }).catch(() => {})
+    loadBusiness()
+    window.addEventListener('businessUpdated', loadBusiness)
+    return () => window.removeEventListener('businessUpdated', loadBusiness)
+  }, [])
+  const allowed = Object.keys(pagePermissions).filter(path => hasPermission(user, pagePermissions[path]) && (!['/dispensing', '/expiry', '/pharmacy-batches', '/pharmacy-prescriptions'].includes(path) || businessType === 'pharmacy'))
   if (role === 'admin') allowed.push('/settings')
   const width = collapsed ? COLLAPSED : EXPANDED
 
   const navigate = (path) => {
-    if (allowed.includes(path)) { setActivePage(path); setSidebarOpen(false) }
+    if (allowed.includes(path)) {
+      setActivePage(path)
+      setVisitedPages((pages) => pages.includes(path) ? pages : [...pages, path])
+      setSidebarOpen(false)
+    }
   }
 
   const toggleCollapsed = () => {
@@ -78,19 +129,11 @@ const Layout = () => {
         <p style={{ fontSize: '14px', color: colors.textMuted }}>{t('shell.noPermission')}</p>
       </div>
     )
-    switch (activePage) {
-      case '/': return <Dashboard />
-      case '/sales': return <Sales />
-      case '/inventory': return <Inventory />
-      case '/dispensing': return <DispensingRegister />
-      case '/purchases': return <Purchases />
-      case '/procurement': return <Procurement />
-      case '/expenses': return <Expenses />
-      case '/clients': return <Clients />
-      case '/reports': return <Reports />
-      case '/settings': return <Settings />
-      default: return <Dashboard />
-    }
+    return visitedPages
+      .filter((path) => allowed.includes(path))
+      .map((path) => (
+        <KeepAlivePage key={path} component={pageComponents[path]} active={path === activePage} />
+      ))
   }
 
   return (
@@ -99,7 +142,7 @@ const Layout = () => {
       {/* Sidebar — desktop (rail inayofunguka/kufungwa) */}
       <div className="pos-sidebar-desktop" style={{ width: `${width}px`, flexShrink: 0, position: 'relative', display: 'flex', transition: 'width 0.22s ease' }}>
         <div style={{ position: 'fixed', top: 0, left: 0, bottom: 0, width: `${width}px`, zIndex: 20, transition: 'width 0.22s ease' }}>
-          <Sidebar activePage={activePage} setActivePage={navigate} collapsed={collapsed} onToggle={toggleCollapsed} />
+          <Sidebar activePage={activePage} setActivePage={navigate} collapsed={collapsed} onToggle={toggleCollapsed} businessName={businessName} logoUrl={logoUrl} businessType={businessType} />
         </div>
       </div>
 
@@ -114,7 +157,7 @@ const Layout = () => {
         transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.22s ease',
         boxShadow: sidebarOpen ? colors.shadowLg : 'none',
       }}>
-        <Sidebar activePage={activePage} setActivePage={navigate} onClose={() => setSidebarOpen(false)} />
+        <Sidebar activePage={activePage} setActivePage={navigate} onClose={() => setSidebarOpen(false)} businessName={businessName} logoUrl={logoUrl} businessType={businessType} />
       </div>
 
       {/* Main content */}
@@ -128,7 +171,7 @@ const Layout = () => {
             <Menu size={20} strokeWidth={1.75} />
           </button>
           <span style={{ fontWeight: '600', fontSize: '15px', color: colors.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {localStorage.getItem('businessName') || 'POS'}
+            {businessName}
           </span>
         </div>
 

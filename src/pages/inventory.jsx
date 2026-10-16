@@ -396,7 +396,7 @@ const Inventory = () => {
           <p>Manage your products and stock</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          {activeTab === 'movements' && canAdjustStock && (
+          {activeTab === 'movements' && canAdjustStock && !isPharmacy && (
             <button className="btn" onClick={() => openAdjustModal()}><Plus size={16} strokeWidth={1.75} /> Adjustment</button>
           )}
           {activeTab === 'conversions' && canConvert && (
@@ -409,6 +409,10 @@ const Inventory = () => {
           )}
         </div>
       </div>
+
+      {isPharmacy && <div role="note" style={{ marginBottom: 16, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-muted)', fontSize: 13 }}>
+        Pharmacy stock changes need a batch reference. Receive stock through Procurement or adjust individual lots in Batch Management.
+      </div>}
 
       {/* Stats */}
       <div className="stats-row">
@@ -477,7 +481,7 @@ const Inventory = () => {
                       <select className="form-input" name="unit" value={form.unit} onChange={handleChange}>{UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select>
                       <p className="form-hint">Smallest unit of sale. Add bigger packs later under "Manage units".</p>
                     </div>
-                    <div className="form-group"><label className="form-label">Stock</label><input className="form-input mono" name="stock" type="number" value={form.stock} onChange={handleChange} placeholder="0" min="0" /></div>
+                    <div className="form-group"><label className="form-label">Stock</label><input className="form-input mono" name="stock" type="number" value={form.stock} onChange={handleChange} placeholder="0" min="0" disabled={isPharmacy && Boolean(editingId)} />{isPharmacy && editingId && <p className="form-hint">Use Procurement or Batch Management to change pharmacy stock.</p>}</div>
                     <div className="form-group"><label className="form-label">Low stock alert</label><input className="form-input mono" name="low_stock_alert" type="number" value={form.low_stock_alert} onChange={handleChange} placeholder="5" /></div>
                   </div>
                 </div>
@@ -487,8 +491,8 @@ const Inventory = () => {
                   <div className="form-section">
                     <p className="form-section-title"><Pill size={15} strokeWidth={1.75} /> Pharmacy details</p>
                     <div className="form-grid">
-                      <div className="form-group"><label className="form-label">Batch number</label><input className="form-input" name="batch_number" value={form.batch_number} onChange={handleChange} placeholder="e.g. B24-0091" /></div>
-                      <div className="form-group"><label className="form-label">Expiry date</label><input className="form-input" name="expiry_date" type="date" value={form.expiry_date} onChange={handleChange} /></div>
+                      <div className="form-group"><label className="form-label">Batch number{!editingId && Number(form.stock) > 0 ? ' *' : ''}</label><input className="form-input" name="batch_number" value={form.batch_number} onChange={handleChange} placeholder="e.g. B24-0091" disabled={Boolean(editingId)} required={!editingId && Number(form.stock) > 0} /></div>
+                      <div className="form-group"><label className="form-label">Expiry date{!editingId && Number(form.stock) > 0 ? ' *' : ''}</label><input className="form-input" name="expiry_date" type="date" value={form.expiry_date} onChange={handleChange} disabled={Boolean(editingId)} required={!editingId && Number(form.stock) > 0} /></div>
                       <div className="form-group"><label className="form-label">Manufacturer</label><input className="form-input" name="manufacturer" value={form.manufacturer} onChange={handleChange} placeholder="e.g. Shelys Pharmaceuticals" /></div>
                       <div className="form-group"><label className="form-label">Drug category</label><select className="form-input" name="drug_category" value={form.drug_category} onChange={handleChange}>{DRUG_CATEGORIES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}</select></div>
                       <div className="form-group"><label className="form-label">Dosage</label><input className="form-input" name="dosage" value={form.dosage} onChange={handleChange} placeholder="e.g. 500mg tablet" /></div>
@@ -568,7 +572,7 @@ const Inventory = () => {
                           <div className="actions">
                             {canEdit && <button className="icon-btn" onClick={() => handleEdit(p)} title="Edit" aria-label={`Edit ${p.name}`}><Pencil size={16} strokeWidth={1.75} /></button>}
                             {canManageUnits && <button className="icon-btn" onClick={() => openUnitsModal(p)} title="Manage units" aria-label={`Manage units for ${p.name}`}><Layers size={16} strokeWidth={1.75} /></button>}
-                            {canAdjustStock && <button className="icon-btn" onClick={() => openAdjustModal(p.id)} title="Adjust stock" aria-label={`Adjust stock for ${p.name}`}><Scale size={16} strokeWidth={1.75} /></button>}
+                            {canAdjustStock && !isPharmacy && <button className="icon-btn" onClick={() => openAdjustModal(p.id)} title="Adjust stock" aria-label={`Adjust stock for ${p.name}`}><Scale size={16} strokeWidth={1.75} /></button>}
                             {canDelete && <button className="icon-btn danger" onClick={() => handleDelete(p)} title="Delete" aria-label={`Delete ${p.name}`}><Trash2 size={16} strokeWidth={1.75} /></button>}
                           </div>
                         </td>
